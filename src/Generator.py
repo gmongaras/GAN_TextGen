@@ -33,7 +33,7 @@ class Generator(nn.Module):
         self.inEmb = nn.Sequential(*modules).to(device)
         
         # Output Embedding (<Start> to some output sequence)
-        self.outEmb = [outTrans(embedding_size, embedding_size, num_heads, embedding_size) for i in range(N)]
+        self.outEmb = nn.ModuleList([outTrans(embedding_size, embedding_size, num_heads, embedding_size) for i in range(N)])
         
         # Used to encode each word from a number to a vector
         self.Word2Vec = nn.Embedding(sequence_length, embedding_size)
@@ -55,8 +55,11 @@ class Generator(nn.Module):
     # Output:
     #   A string of max length 256 words
     def forward(self, X=torch.tensor(1)):
+        # Put the model in test/eval mode
+        self.eval()
+        
         # Generate some noise
-        noise = torch.rand((self.sequence_length, self.embedding_size))
+        noise = torch.rand((self.sequence_length, self.embedding_size), requires_grad=False)
         
         # Send the noise through the input transformers
         Z = self.inEmb(noise)
@@ -97,7 +100,8 @@ class Generator(nn.Module):
             
             # Save the sentences
             for i in range(self.batchSize):
-                out_sent[i].append(self.vocab[out_tok[i].detach().item()])
+                out_sent[i].append(out_tok[i])
+                #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
             
             # Encode the output token
             out_tok = self.Word2Vec(out_tok)
@@ -106,7 +110,7 @@ class Generator(nn.Module):
             Y_noEnc[:, tok] = out_tok
         
         # Return the output
-        return out_sent
+        return out_sent[0]
     
     
     # Train the model
@@ -165,8 +169,8 @@ class Generator(nn.Module):
                 # Add the new token to the output
                 Y_noEnc[:, tok] = out_tok
             
-            # Return the output
-            return out_sent
+        # Return the output
+        return out_sent
     
     
     # Save the model

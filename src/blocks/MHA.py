@@ -41,6 +41,7 @@ class MHA(nn.Module):
     #   A 3-D tensor of shape (N, S, output_embedding)
     def forward(self, X_1, X_2):
         # Get the key, query, value embedings
+        X_2 = X_2
         query = self.query_weights(X_2)
         value = torch.broadcast_to(self.value_weights(X_1), query.shape)
         key = torch.broadcast_to(self.key_weights(X_1), query.shape)
