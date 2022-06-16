@@ -23,7 +23,7 @@ class Generator(nn.Module):
     #   Nothing
     # Output:
     #   A string of max length 256 words
-    def forward(self):
+    def forward(self, X):
         noise = torch.rand((10, 256))
         
         return torch.argmax(self.model(noise), dim=-1)
@@ -37,7 +37,7 @@ class Generator(nn.Module):
             os.makedirs(saveDir)
         
         # Save the model
-        torch.save(self.state_dict, saveDir + os.sep + saveFile)
+        torch.save(self.state_dict(), saveDir + os.sep + saveFile)
     
     
     # Load the model
