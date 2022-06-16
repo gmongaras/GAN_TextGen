@@ -51,15 +51,15 @@ class Generator(nn.Module):
     
     
     # Input:
-    #   A trash input that does nothing
+    #   A random noise tensor of shape (self.sequence_length, self.embedding_size)
     # Output:
     #   A string of max length 256 words
-    def forward(self, X=torch.tensor(1)):
+    def forward(self, noise):
         # Put the model in test/eval mode
         self.eval()
         
         # Generate some noise
-        noise = torch.rand((self.sequence_length, self.embedding_size), requires_grad=False)
+        #noise = torch.rand((self.sequence_length, self.embedding_size), requires_grad=False)
         
         # Send the noise through the input transformers
         Z = self.inEmb(noise)

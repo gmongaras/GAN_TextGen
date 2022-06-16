@@ -22,7 +22,6 @@ def main():
     ### Load in the data ###
     ...
     from Generator import Generator
-    vocab = {0:"<START>", 1:"<END>", 2:"<PAD>"}
     X_1 = torch.rand((20, 64, 5))
     X_2 = torch.rand((20, 64, 10))
     
@@ -30,12 +29,22 @@ def main():
     
     
     ### Create the model ###
-    model = Generator(vocab, 2, 2, 10, 10, 64, 2, torch.device("cpu"))
+    
+    # Model paramters
+    vocab = {0:"<START>", 1:"<END>", 2:"<PAD>", 3:"hello"}
+    M = 2
+    N = 2
+    batchSize = 1
+    embedding_size = 10
+    sequence_length = 64
+    num_heads = 2
+    
+    model = Generator(vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, torch.device("cpu"))
     out = model()
     model.saveModel(saveDir, saveFile)
-    for i in out:
-        print(" ".join(i))
-    print()
+    #for i in out:
+    #    print(" ".join(vocab[i.item()]))
+    #print()
     
     
 main()

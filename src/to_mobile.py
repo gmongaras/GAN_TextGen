@@ -19,7 +19,7 @@ def main():
     
 
     # Model paramters
-    vocab = {0:"<START>", 1:"<END>", 2:"<PAD>"}
+    vocab = {0:"<START>", 1:"<END>", 2:"<PAD>", 3:"hello"}
     M = 2
     N = 2
     batchSize = 1
@@ -32,7 +32,8 @@ def main():
         model = Generator(vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, torch.device("cpu"))
         model.loadModel(in_dir, in_file)
         model.eval()
-        traced_script_module = torch.jit.trace(model, torch.tensor(0))
+        noise = torch.rand((sequence_length, embedding_size), requires_grad=False)
+        traced_script_module = torch.jit.trace(model, noise)
         traced_script_module_optimized = optimize_for_mobile(traced_script_module)
         traced_script_module_optimized._save_for_lite_interpreter(out_dir + os.sep + out_file)
     
