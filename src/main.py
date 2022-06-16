@@ -1,5 +1,6 @@
 import torch
 from Generator import Generator
+from helpers import loadVocab
 
 
 
@@ -9,7 +10,7 @@ from Generator import Generator
 def main():
     # Paramters
     input_file = "data/data.txt"
-    vocab = {0: "hello", 1: ":)", 2:":("}
+    vocab_file = "vocab.csv"
     
     # Saving/Loading paramters
     saveDir = "models/"
@@ -26,12 +27,13 @@ def main():
     X_2 = torch.rand((20, 64, 10))
     
     
+    ### Load in the vocab ###    
+    vocab = loadVocab(vocab_file)
     
     
     ### Create the model ###
     
     # Model paramters
-    vocab = {0:"<START>", 1:"<END>", 2:"<PAD>", 3:"hello"}
     M = 2
     N = 2
     batchSize = 1
@@ -39,12 +41,14 @@ def main():
     sequence_length = 64
     num_heads = 2
     
+    noise = torch.rand((sequence_length, embedding_size), requires_grad=False)
+    
     model = Generator(vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, torch.device("cpu"))
-    out = model()
+    out = model(noise)
     model.saveModel(saveDir, saveFile)
-    #for i in out:
-    #    print(" ".join(vocab[i.item()]))
-    #print()
+    for i in out:
+        print(vocab[i.item()], end=" ")
+    print()
     
     
 main()

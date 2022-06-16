@@ -36,10 +36,10 @@ class Generator(nn.Module):
         self.outEmb = nn.ModuleList([outTrans(embedding_size, embedding_size, num_heads, embedding_size) for i in range(N)])
         
         # Used to encode each word from a number to a vector
-        self.Word2Vec = nn.Embedding(sequence_length, embedding_size)
+        self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size)
         
         # Positional encoding block
-        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.1)
+        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.1, 100000)
         
         # Softmax block for the output
         self.soft = nn.Sequential(

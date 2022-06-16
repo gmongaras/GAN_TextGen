@@ -7,6 +7,7 @@ import torchvision
 from torch.utils.mobile_optimizer import optimize_for_mobile
 from Generator import Generator
 import os
+from helpers import loadVocab
 
 
 
@@ -17,9 +18,11 @@ def main():
     out_dir = "models_mobile"
     out_file = "model.ptl"
     
+    vocab_file = "vocab.csv"
+    
 
     # Model paramters
-    vocab = {0:"<START>", 1:"<END>", 2:"<PAD>", 3:"hello"}
+    vocab = loadVocab(vocab_file)
     M = 2
     N = 2
     batchSize = 1
