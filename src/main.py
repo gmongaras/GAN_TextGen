@@ -15,11 +15,11 @@ def main():
     vocab_file = "vocab.csv"
     
     # Saving/Loading paramters
-    saveDir = "models/"
+    saveDir = "models"
     genSaveFile = "gen_model.pkl"
     discSaveFile = "disc_model.pkl"
     
-    loadDir = "models/"
+    loadDir = "models"
     genLoadFile = "gen_model.pkl"
     discLoadFile = "disc_model.pkl"
     
@@ -48,7 +48,7 @@ def main():
     num_heads = 2
     alpha = 0.001
     device = torch.device("cpu")
-    epochs = 50
+    epochs = 5
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
     
     # Create the model
@@ -58,14 +58,15 @@ def main():
     
     
     ### Training The Model ###
-    model.train_model(sentences, epochs)
+    #model.train_model(sentences, epochs)
+    model.loadModels(loadDir, genLoadFile, discLoadFile)
     print()
     
     
     ### Model Saving and Predictions ###
-    noise = torch.rand((batchSize, sequence_length, embedding_size), requires_grad=False)
+    noise = torch.rand((sequence_length, embedding_size), requires_grad=False)
     out = model.generator(noise)
-    model.saveModels(saveDir, genSaveFile, discSaveFile)
+    #model.saveModels(saveDir, genSaveFile, discSaveFile)
     for i in out:
         print(vocab[i.item()], end=" ")
     

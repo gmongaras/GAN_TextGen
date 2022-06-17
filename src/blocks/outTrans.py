@@ -42,15 +42,19 @@ class outTrans(nn.Module):
     #     the output sentence word embeddings
     def forward(self, X_1, X_2):
         X = self.MHA1(X_2, X_2)
-        X = self.LN1(X)
         X += X_2
+        X = self.LN1(X)
+        
+        noise = torch.rand((X.shape), requires_grad=True)
+        X += noise
         
         X_saved = X.clone()
         X = self.MHA2(X_1, X)
-        X = self.LN2(X)
         X += X_saved
+        X = self.LN2(X)
         
         X_saved = X.clone()
         X = self.FF(X)
+        X += X_saved
         X = self.LN3(X)
-        return X + X_saved
+        return X

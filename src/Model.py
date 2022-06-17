@@ -157,7 +157,7 @@ class Model(nn.Module):
                 self.optim_disc.zero_grad()
             
             
-            print(f"Epoch: {epoch}   Generator Loss: {genLoss.item()}     Discriminator Loss: {discLoss.item()}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 2)}     Discriminator Loss: {round(discLoss.item(), 2)}\n")
             
             # Iterate until the number of items in the list
             # is lower than the batch num

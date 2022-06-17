@@ -33,10 +33,11 @@ class inTrans(nn.Module):
     def forward(self, X):
         X_saved = X.clone()
         X = self.MHA(X, X)
-        X = self.LN1(X)
         X += X_saved
+        X = self.LN1(X)
         
         X_saved = X.clone()
         X = self.FF(X)
+        X += X_saved
         X = self.LN2(X)
-        return X + X_saved
+        return X
