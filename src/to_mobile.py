@@ -14,7 +14,7 @@ from helpers import loadVocab
 
 def main():
     in_dir = "models"
-    in_file = "model.pkl"
+    in_file = "gen_model.pkl"
     out_dir = "models_mobile"
     out_file = "model.ptl"
     

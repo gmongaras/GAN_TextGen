@@ -1,5 +1,7 @@
+from statistics import mode
 import torch
 from Generator import Generator
+from Model import Model
 from helpers import loadVocab
 
 
@@ -14,17 +16,20 @@ def main():
     
     # Saving/Loading paramters
     saveDir = "models/"
-    saveFile = "model.pkl"
+    genSaveFile = "gen_model.pkl"
+    discSaveFile = "disc_model.pkl"
+    
     loadDir = "models/"
-    loadFile = "model.pkl"
+    genLoadFile = "gen_model.pkl"
+    discLoadFile = "disc_model.pkl"
     
     
     
     ### Load in the data ###
-    ...
-    from Generator import Generator
-    X_1 = torch.rand((20, 64, 5))
-    X_2 = torch.rand((20, 64, 10))
+    sentences = []
+    with open(input_file, "r") as file:
+        for line in file:
+            sentences.append(line.strip())
     
     
     ### Load in the vocab ###    
@@ -34,21 +39,35 @@ def main():
     ### Create the model ###
     
     # Model paramters
-    M = 2
-    N = 2
-    batchSize = 1
+    M_gen = 2
+    N_gen = 2
+    N_disc = 2
+    batchSize = 10
     embedding_size = 10
-    sequence_length = 64
+    sequence_length = 128
     num_heads = 2
+    alpha = 0.001
+    device = torch.device("cpu")
+    epochs = 50
+    trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
     
-    noise = torch.rand((sequence_length, embedding_size), requires_grad=False)
+    # Create the model
+    model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
+                  embedding_size, sequence_length, num_heads,
+                  trainingRatio, alpha, device)
     
-    model = Generator(vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, torch.device("cpu"))
-    out = model(noise)
-    model.saveModel(saveDir, saveFile)
+    
+    ### Training The Model ###
+    model.train_model(sentences, epochs)
+    print()
+    
+    
+    ### Model Saving and Predictions ###
+    noise = torch.rand((batchSize, sequence_length, embedding_size), requires_grad=False)
+    out = model.generator(noise)
+    model.saveModels(saveDir, genSaveFile, discSaveFile)
     for i in out:
         print(vocab[i.item()], end=" ")
-    print()
     
     
 main()

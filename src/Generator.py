@@ -50,6 +50,7 @@ class Generator(nn.Module):
     
     
     
+    # Forward pass used after training
     # Input:
     #   A random noise tensor of shape (self.sequence_length, self.embedding_size)
     # Output:
@@ -113,62 +114,76 @@ class Generator(nn.Module):
         return out_sent[0]
     
     
-    # Train the model
-    def trainModel(self, X, Y):
-        # Iterate epochs number of times to train the model
-        for epoch in self.epochs:
-            # Generate some noise
-            noise = torch.rand((self.sequence_length, self.embedding_size))
+
+    # Forward pass used during training
+    # Input:
+    #   Nothing
+    # Output:
+    #   A 3-D tensor of shape (N, sequence_length, vocab_size)
+    #   where the vocab_size is a softmaxed output
+    def forward_train(self):
+        # Put the model in train mode
+        self.train()
+        
+        # Generate some noise
+        noise = torch.rand((self.batchSize, self.sequence_length, self.embedding_size), requires_grad=False)
+        
+        # Send the noise through the input transformers
+        Z = self.inEmb(noise)
+        
+        # Initialize the output of the model to a bunch of <PAD> tokens
+        Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
+        Y = self.Word2Vec(Y) # Embed the token
+        Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
+        
+        # Change the first token of the output to <START> tokens
+        Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
+        Y_noEnc = Y.clone()
+        del Y
+        
+        # The output sentences
+        out_sent = [[] for i in range(self.batchSize)]
+        
+        # Iterate to generate a sentence of new words
+        for tok in range(1, self.sequence_length+1):
+            # Save the output tensor before psoitional encoding
+            Y = Y_noEnc.clone()
             
-            # Send the noise through the input transformers
-            Z = self.inEmb(noise)
+            # Positionally encode the output
+            Y = self.PositionalEncoding(Y_noEnc)
             
-            # Initialize the output of the model to a bunch of <PAD> tokens
-            Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
-            Y = self.Word2Vec(Y) # Embed the token
-            Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
+            # Send the output through the output decoder
+            for block in self.outEmb:
+                Y = block(Z, Y)
+                
+            # Get the token from the output
+            out_tok = Y[:, tok-1]
             
-            # Change the first token of the output to <START> tokens
-            Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
-            Y_noEnc = Y.clone()
-            del Y
+            # Send the output through a softmax block
+            out_tok_soft = self.soft(out_tok)
             
-            # The output sentences
-            out_sent = [[] for i in range(self.batchSize)]
+            # Get the argmax of the output tokens
+            out_tok = torch.argmax(out_tok_soft, dim=-1)
             
-            # Iterate to generate a sentence of new words
-            for tok in range(1, self.sequence_length):
-                # Save the output tensor before psoitional encoding
-                Y = Y_noEnc.clone()
-                
-                # Positionally encode the output
-                Y = self.PositionalEncoding(Y_noEnc)
-                
-                # Send the output through the output decoder
-                for block in self.outEmb:
-                    Y = block(Z, Y)
-                    
-                # Get the token from the output
-                out_tok = Y[:, tok]
-                
-                # Send the output through a softmax block
-                out_tok_soft = self.soft(out_tok)
-                
-                # Get the argmax of the output tokens
-                out_tok = torch.argmax(out_tok_soft, dim=-1)
-                
-                # Save the sentences
-                for i in range(self.batchSize):
-                    out_sent[i].append(self.vocab[out_tok[i].detach().item()])
-                
-                # Loss stuff
-                
-                # Encode the output token
-                out_tok = self.Word2Vec(out_tok)
-                
-                # Add the new token to the output
-                Y_noEnc[:, tok] = out_tok
+            # Save the softmax output
+            for i in range(self.batchSize):
+                out_sent[i].append(out_tok_soft[i])
+            #    #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
             
+            # Encode the output token
+            out_tok = self.Word2Vec(out_tok)
+            
+            # Save the tokenized new word
+            #for i in range(self.batchSize):
+            #    out_sent[i].append(out_tok[i])
+            
+            # Add the new token to the output
+            Y_noEnc[:, tok-1] = out_tok
+        
+        # Turn the output into a tensor
+        out_sent = [torch.stack(sent) for sent in out_sent]
+        out_sent = torch.stack(out_sent)
+        
         # Return the output
         return out_sent
     
