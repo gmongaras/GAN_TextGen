@@ -50,7 +50,7 @@ def main():
     epochs = 50
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = 10 # Decrease the ratio after every decRatRate steps
-    saveSteps = 1 # Number of steps until the model is saved
+    saveSteps = 10 # Number of steps until the model is saved
     
     # Create the model
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 

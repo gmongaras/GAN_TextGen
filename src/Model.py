@@ -89,7 +89,7 @@ class Model(nn.Module):
         for epoch in range(1, epochs+1):
             # Model saving
             if epoch % self.saveSteps == 0:
-                self.saveModels(self.saveDir, self.genSaveFile, self.discSaveFile)
+                self.saveModels(self.saveDir, self.genSaveFile, self.discSaveFile, epoch)
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
@@ -171,7 +171,7 @@ class Model(nn.Module):
                 #genLoss = minimax_loss(disc_real, disc_fake)
                 
                 # Get the generator loss
-                genLoss = minimax_gen(disc_fake)
+                genLoss = wasserstein_gen(disc_fake)
                 
                 # Backpropogate the loss
                 genLoss.backward()
@@ -241,9 +241,18 @@ class Model(nn.Module):
     
     
     # Save the models
-    def saveModels(self, saveDir, genFile, discFile):
-        self.generator.saveModel(saveDir, genFile)
-        self.discriminator.saveModel(saveDir, discFile)
+    def saveModels(self, saveDir, genFile, discFile, epoch=None):
+        if epoch == None:
+            self.generator.saveModel(saveDir, genFile)
+            self.discriminator.saveModel(saveDir, discFile)
+        else:
+            l = len(genFile.split(".")[-1])+1
+            genFile = genFile[:-l] + f" - {epoch}.pkl"
+            l = len(discFile.split(".")[-1])+1
+            discFile = discFile[:-l] + f" - {epoch}.pkl"
+            
+            self.generator.saveModel(saveDir, genFile)
+            self.discriminator.saveModel(saveDir, discFile)
     
     # Load the models
     def loadModels(self, loadDir, genFile, discFile):
