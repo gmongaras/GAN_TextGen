@@ -1,4 +1,3 @@
-from statistics import mode
 import torch
 from Generator import Generator
 from Model import Model
@@ -46,20 +45,23 @@ def main():
     embedding_size = 10
     sequence_length = 128
     num_heads = 2
-    alpha = 0.001
+    alpha = 0.00005
     device = torch.device("cpu")
-    epochs = 5
+    epochs = 50
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
+    decRatRate = 10 # Decrease the ratio after every decRatRate steps
+    saveSteps = 1 # Number of steps until the model is saved
     
     # Create the model
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                   embedding_size, sequence_length, num_heads,
-                  trainingRatio, alpha, device)
+                  trainingRatio, decRatRate, alpha, device,
+                  saveSteps, saveDir, genSaveFile, discSaveFile)
     
     
     ### Training The Model ###
-    #model.train_model(sentences, epochs)
-    model.loadModels(loadDir, genLoadFile, discLoadFile)
+    model.train_model(sentences, epochs)
+    #model.loadModels(loadDir, genLoadFile, discLoadFile)
     print()
     
     

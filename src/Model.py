@@ -4,7 +4,8 @@ from helpers import addPadding
 from helpers import addPadding_one_hot
 
 
-from losses import wasserstein_loss
+from losses import wasserstein_disc
+from losses import wasserstein_gen
 from losses import minimax_disc
 from losses import minimax_gen
 from losses import minimax_loss
@@ -33,10 +34,19 @@ class Model(nn.Module):
     #   num_heads - Number of heads for the MHA modules
     #   trainingRatio - 2-D array representing the number of epochs to 
     #                   train the generator (0) vs the discriminator (1)
+    #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
+    #                never decrease the ratio
     #   alpha - Learning rate of the model
     #   device - Device to put the model on
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, alpha, device):
+    #   saveSteps - Number of steps until the model is saved
+    #   saveDir - Directory to save the model to
+    #   genSaveFile - Name of the file to save the generator model to
+    #   discSaveFile - Name of the file to save the discriminator model to
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, device, saveSteps, saveDir, genSaveFile, discSaveFile):
         super(Model, self).__init__()
+        
+        # The ratio must not have a lower value for the discriminator (1)
+        assert trainingRatio[0]<=trainingRatio[1], "The training ratio must have a grater number in the zeroth index"
         
         # Save the needed variables
         self.vocab = vocab
@@ -44,14 +54,21 @@ class Model(nn.Module):
         self.sequence_length = sequence_length
         self.batchSize = batchSize
         self.trainingRatio = trainingRatio
+        self.decRatRate = decRatRate
+        
+        # Saving paramters
+        self.saveSteps = saveSteps
+        self.saveDir = saveDir
+        self.genSaveFile = genSaveFile
+        self.discSaveFile = discSaveFile
         
         # The generator and discriminator models
         self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, device)
         self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads)
         
         # The optimizer for the model
-        self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha)
-        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha)
+        self.optim_gen = torch.optim.RMSprop(self.generator.parameters(), alpha)
+        self.optim_disc = torch.optim.RMSprop(self.discriminator.parameters(), alpha)
         
         
     def one_hot(a, num_classes):
@@ -70,13 +87,61 @@ class Model(nn.Module):
         
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
+            # Model saving
+            if epoch % self.saveSteps == 0:
+                self.saveModels(self.saveDir, self.genSaveFile, self.discSaveFile)
+            
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
             disc_nums = torch.randperm(len(X_orig))
             gen_nums = torch.randperm(len(X_orig))
             
-            # Train the generator first
-            for i in range(0, self.trainingRatio[0]):
+            # Train the discriminator first
+            for i in range(0, max(self.trainingRatio[1], 1)):
+                # Sample the data to get data the generator and
+                # discriminator will see
+                disc_sub = disc_nums[:self.batchSize]
+                disc_nums = disc_nums[self.batchSize:]
+                gen_sub = gen_nums[:self.batchSize]
+                gen_nums = gen_nums[self.batchSize:]
+                
+                # Generate some data from the generator
+                Y = self.generator.forward_train()
+                
+                # Send the generated output through the discriminator
+                # to get a batch of predictions on the fake sentences
+                disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
+                
+                # Get a real data subset using one_hot encoding
+                real_X = X_orig_one_hot[disc_sub.detach().numpy()]
+                
+                # Add padding to the subset
+                real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
+                
+                # Send the real output throuh the discriminator to
+                # get a batch of predictions on the real sentences
+                disc_real = torch.squeeze(self.discriminator(real_X)) # Predictions
+                
+                # Get the discriminator loss. Negative to
+                # maximize the loss
+                #discLoss = -minimax_loss(disc_real, disc_fake)
+                
+                # Get the discriminator loss
+                #discLoss = minimax_disc(disc_real, disc_fake)
+                discLoss = wasserstein_disc(disc_real, disc_fake)
+                
+                # Backpropogate the loss
+                discLoss.backward()
+                
+                # Clip the loss
+                torch.nn.utils.clip_grad_value_(self.parameters(), 0.01)
+                
+                # Step the optimizer
+                self.optim_disc.step()
+                self.optim_disc.zero_grad()
+            
+            # Train the generator next
+            for i in range(0, max(self.trainingRatio[0], 1)):
                 # Get subset indices of the data for the generator
                 # and discriminator
                 disc_sub = disc_nums[:self.batchSize]
@@ -116,45 +181,10 @@ class Model(nn.Module):
                 self.optim_gen.zero_grad()
             
             
-            # Train the discriminator next
-            for i in range(0, self.trainingRatio[1]):
-                # Get subset indices of the data for the generator
-                # and discriminator
-                disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
-                gen_sub = gen_nums[:self.batchSize]
-                gen_nums = gen_nums[self.batchSize:]
-                
-                # Generate some data from the generator
-                Y = self.generator.forward_train()
-                
-                # Send the generated output through the discriminator
-                # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
-                
-                # Get a real data subset using one_hot encoding
-                real_X = X_orig_one_hot[disc_sub.detach().numpy()]
-                
-                # Add padding to the subset
-                real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
-                
-                # Send the real output throuh the discriminator to
-                # get a batch of predictions on the real sentences
-                disc_real = torch.squeeze(self.discriminator(real_X)) # Predictions
-                
-                # Get the discriminator loss. Negative to
-                # maximize the loss
-                #discLoss = -minimax_loss(disc_real, disc_fake)
-                
-                # Get the discriminator loss
-                discLoss = minimax_disc(disc_real, disc_fake)
-                
-                # Backpropogate the loss
-                discLoss.backward()
-                
-                # Step the optimizer
-                self.optim_disc.step()
-                self.optim_disc.zero_grad()
+            # Decrease the rate
+            if epochs%self.decRatRate == 0 and self.decRatRate > 0:
+                self.trainingRatio[0] -= 1
+                self.trainingRatio[1] -= 1
             
             
             print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 2)}     Discriminator Loss: {round(discLoss.item(), 2)}\n")

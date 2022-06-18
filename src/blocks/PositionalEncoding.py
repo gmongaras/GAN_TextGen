@@ -1,4 +1,3 @@
-from constraint import Variable
 import torch
 from torch import nn
 import math
