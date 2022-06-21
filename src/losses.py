@@ -13,7 +13,7 @@ import torch
 #   disc_real - Discriminator output on real data
 #   disc_fake - Discriminator output on fake data
 def wasserstein_disc(disc_real, disc_fake):
-    return -(torch.mean(disc_real) - torch.mean(disc_fake))
+    return -(torch.mean(disc_real - disc_fake))
 
 # In this loss function, we want to maximize the score of the
 # critic when the critic is given fake data. Since the critic

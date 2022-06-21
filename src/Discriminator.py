@@ -76,7 +76,7 @@ class Discriminator(nn.Module):
         
         # Send the token through a feed-forward network layer
         X = self.out_FF(X)
-        X = self.Sigmoid(X)
+        #X = self.Sigmoid(X)
         #X = self.Tanh(X)
         
         return X
