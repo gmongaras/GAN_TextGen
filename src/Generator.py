@@ -62,37 +62,43 @@ class Generator(nn.Module):
         if len(noise.shape) != 3:
             noise = torch.unsqueeze(noise, dim=0)
         
+        
         # Generate some noise
-        #noise = torch.rand((self.sequence_length, self.embedding_size), requires_grad=False)
+        #noise = torch.rand((self.batchSize, self.sequence_length, self.embedding_size), requires_grad=False)
         
         # Send the noise through the input transformers
         Z = self.inEmb(noise)
         
+        # Initiailze the model output to <START> tokens
+        Y = torch.broadcast_to(self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
+        
         # Initialize the output of the model to a bunch of <PAD> tokens
-        Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
-        Y = self.Word2Vec(Y) # Embed the token
-        Y = torch.broadcast_to(Y, (noise.shape[0], self.sequence_length, self.embedding_size)).clone() # Broadcast
+        #Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
+        #Y = self.Word2Vec(Y) # Embed the token
+        #Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
         
         # Change the first token of the output to <START> tokens
-        Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
+        #Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
         
-        # Get some positional encodings
-        posEnc = self.PositionalEncoding(torch.zeros(Y.shape))
+        # Get positional encodings for all tokens uncluding future
+        # tokens that will be generated
+        posEnc = self.PositionalEncoding(torch.zeros(noise.shape, requires_grad=True))
         
         # Add the positional encodings to the input tokens
-        Y += posEnc
+        Y += posEnc[:, 0:1]
         
-        # The output sentences
-        out_sent = [[] for i in range(noise.shape[0])]
+        # The tokenzied output sentences
+        out_sent = [[] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
             # Send the output through the output decoder
+            output = Y
             for block in self.outEmb:
-                output = block(Z, Y)
+                output = block(Z[:, 0:Y.shape[1]], output)
                 
             # Get the token from the output
-            out_tok = output[:, tok]
+            out_tok = output[:, tok-1]
             
             # Send the output through a softmax block
             out_tok_soft = self.soft(out_tok)
@@ -100,17 +106,27 @@ class Generator(nn.Module):
             # Get the argmax of the output tokens
             out_tok = torch.argmax(out_tok_soft, dim=-1)
             
-            # Save the sentences
-            for i in range(noise.shape[0]):
-                out_sent[i].append(out_tok[i])
-                #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
+            # Save the softmax output
+            #for i in range(self.batchSize):
+            #    out_sent[i].append(out_tok_soft[i])
+            #    #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
             
+            # Save the tokenized new word
+            for i in range(self.batchSize):
+                out_sent[i].append(out_tok[i])
+                
             # Encode the output token
             out_tok = self.Word2Vec(out_tok)
             
-            # Add the new token to the output with positional encodings
-            Y[:, tok] = out_tok
+            # Add the new token to the output
+            #Y = Y.clone()
+            #Y[:, tok] = out_tok
+            Y = torch.cat((Y, torch.unsqueeze(out_tok, dim=1)), dim=1)
             Y[:, tok] += posEnc[:, tok]
+        
+        # Turn the output into a tensor
+        #out_sent = [torch.stack(sent) for sent in out_sent]
+        #out_sent = torch.stack(out_sent)
         
         # Return the output
         return torch.stack(out_sent[0])
@@ -133,31 +149,36 @@ class Generator(nn.Module):
         # Send the noise through the input transformers
         Z = self.inEmb(noise)
         
+        # Initiailze the model output to <START> tokens
+        Y = torch.broadcast_to(self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
+        
         # Initialize the output of the model to a bunch of <PAD> tokens
-        Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
-        Y = self.Word2Vec(Y) # Embed the token
-        Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
+        #Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
+        #Y = self.Word2Vec(Y) # Embed the token
+        #Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
         
         # Change the first token of the output to <START> tokens
-        Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
+        #Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
         
-        # Get some positional encodings
-        posEnc = self.PositionalEncoding(torch.zeros(Y.shape, requires_grad=True))
+        # Get positional encodings for all tokens uncluding future
+        # tokens that will be generated
+        posEnc = self.PositionalEncoding(torch.zeros(noise.shape, requires_grad=True))
         
         # Add the positional encodings to the input tokens
-        Y += posEnc
+        Y += posEnc[:, 0:1]
         
-        # The output sentences
+        # The tokenzied output sentences
         out_sent = [[] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
             # Send the output through the output decoder
+            output = Y
             for block in self.outEmb:
-                output = block(Z, Y)
+                output = block(Z[:, 0:Y.shape[1]], output)
                 
             # Get the token from the output
-            out_tok = output[:, tok]
+            out_tok = output[:, tok-1]
             
             # Send the output through a softmax block
             out_tok_soft = self.soft(out_tok)
@@ -178,8 +199,9 @@ class Generator(nn.Module):
             #    out_sent[i].append(out_tok[i])
             
             # Add the new token to the output
-            Y = Y.clone()
-            Y[:, tok] = out_tok
+            #Y = Y.clone()
+            #Y[:, tok] = out_tok
+            Y = torch.cat((Y, torch.unsqueeze(out_tok, dim=1)), dim=1)
             Y[:, tok] += posEnc[:, tok]
         
         # Turn the output into a tensor

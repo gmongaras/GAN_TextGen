@@ -127,14 +127,14 @@ class Model(nn.Module):
                 #discLoss = -minimax_loss(disc_real, disc_fake)
                 
                 # Get the discriminator loss
-                #discLoss = minimax_disc(disc_real, disc_fake)
-                discLoss = wasserstein_disc(disc_real, disc_fake)
+                discLoss = minimax_disc(disc_real, disc_fake)
+                #discLoss = wasserstein_disc(disc_real, disc_fake)
                 
                 # Backpropogate the loss
                 discLoss.backward()
                 
-                # Clip the loss
-                torch.nn.utils.clip_grad_value_(self.parameters(), 0.01)
+                # Clip the gradients
+                #torch.nn.utils.clip_grad_value_(self.parameters(), 0.01)
                 
                 # Step the optimizer
                 self.optim_disc.step()
@@ -171,7 +171,8 @@ class Model(nn.Module):
                 #genLoss = minimax_loss(disc_real, disc_fake)
                 
                 # Get the generator loss
-                genLoss = wasserstein_gen(disc_fake)
+                genLoss = minimax_gen(disc_fake)
+                #genLoss = wasserstein_gen(disc_fake)
                 
                 # Backpropogate the loss
                 genLoss.backward()
