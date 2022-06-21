@@ -17,6 +17,8 @@ import torch
 from torch import nn
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 
 
 
@@ -42,7 +44,8 @@ class Model(nn.Module):
     #   saveDir - Directory to save the model to
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, device, saveSteps, saveDir, genSaveFile, discSaveFile):
+    #   trainGraphFile - File to save training graph during training
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
         super(Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -61,6 +64,7 @@ class Model(nn.Module):
         self.saveDir = saveDir
         self.genSaveFile = genSaveFile
         self.discSaveFile = discSaveFile
+        self.trainGraphFile = trainGraphFile
         
         # The generator and discriminator models
         self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, device)
@@ -84,6 +88,10 @@ class Model(nn.Module):
         # Encode the sentences
         X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec), dtype=object)
         X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length), dtype=object)
+        
+        # Save loss values over training for the loss plot
+        self.genLoss = []
+        self.discLoss = []
         
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
@@ -186,7 +194,15 @@ class Model(nn.Module):
             if epochs%self.decRatRate == 0 and self.decRatRate > 0:
                 self.trainingRatio[0] -= 1
                 self.trainingRatio[1] -= 1
-            
+                
+            # Convert the losses. If the loss should be maximized,
+            # multiply by a negative to get the actual value
+            genLoss = genLoss*-1
+            discLoss = discLoss*-1
+                
+            # Save the loss values
+            self.genLoss.append(-genLoss.item())
+            self.discLoss.append(-discLoss.item())
             
             print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 2)}     Discriminator Loss: {round(discLoss.item(), 2)}\n")
             
@@ -241,7 +257,7 @@ class Model(nn.Module):
     
     
     
-    # Save the models
+    # Save the models and a training graph
     def saveModels(self, saveDir, genFile, discFile, epoch=None):
         if epoch == None:
             self.generator.saveModel(saveDir, genFile)
@@ -254,6 +270,17 @@ class Model(nn.Module):
             
             self.generator.saveModel(saveDir, genFile)
             self.discriminator.saveModel(saveDir, discFile)
+            
+            if self.trainGraphFile:
+                fix, ax = plt.subplots()
+                ax.plot([i for i in range(len(self.genLoss))], self.genLoss, label="Gen loss")
+                ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss")
+                ax.set_title("Gen and disc loss over epochs")
+                ax.set_xlabel("Epochs")
+                ax.set_ylabel("Loss")
+                ax.legend()
+                plt.savefig(self.trainGraphFile)
+                print()
     
     # Load the models
     def loadModels(self, loadDir, genFile, discFile):

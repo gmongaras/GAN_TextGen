@@ -17,6 +17,7 @@ def main():
     saveDir = "models"
     genSaveFile = "gen_model.pkl"
     discSaveFile = "disc_model.pkl"
+    trainGraphFile = "trainGraph.png"
     
     loadDir = "models"
     genLoadFile = "gen_model.pkl"
@@ -56,7 +57,8 @@ def main():
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                   embedding_size, sequence_length, num_heads,
                   trainingRatio, decRatRate, alpha, device,
-                  saveSteps, saveDir, genSaveFile, discSaveFile)
+                  saveSteps, saveDir, genSaveFile, discSaveFile,
+                  trainGraphFile)
     
     
     ### Training The Model ###
