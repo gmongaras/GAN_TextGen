@@ -71,8 +71,8 @@ class Model(nn.Module):
         self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads)
         
         # The optimizer for the model
-        self.optim_gen = torch.optim.RMSprop(self.generator.parameters(), alpha)
-        self.optim_disc = torch.optim.RMSprop(self.discriminator.parameters(), alpha)
+        self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha)
+        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha)
         
         
     def one_hot(a, num_classes):
