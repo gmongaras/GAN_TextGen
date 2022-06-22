@@ -68,7 +68,7 @@ def main():
     
     
     ### Model Saving and Predictions ###
-    noise = torch.rand((sequence_length, embedding_size), requires_grad=False)
+    noise = torch.rand((sequence_length), requires_grad=False)
     out = model.generator(noise)
     #model.saveModels(saveDir, genSaveFile, discSaveFile)
     for i in out:

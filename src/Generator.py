@@ -29,8 +29,10 @@ class Generator(nn.Module):
         self.device = device
         
         # Input embedding (noise to some sort of embedding)
-        modules = [inTrans(embedding_size, num_heads, embedding_size) for i in range(M)]
-        self.inEmb = nn.Sequential(*modules).to(device)
+        #modules = [inTrans(embedding_size, num_heads, embedding_size) for i in range(M)]
+        #self.inEmb = nn.Sequential(*modules).to(device)
+        modules = [nn.Linear(self.sequence_length, self.sequence_length) for i in range(M)]
+        self.inEmb2 = nn.Sequential(*modules).to(device)
         
         # Output Embedding (<Start> to some output sequence)
         self.outEmb = nn.ModuleList([outTrans(embedding_size, embedding_size, num_heads, embedding_size) for i in range(N)])
@@ -52,14 +54,14 @@ class Generator(nn.Module):
     
     # Forward pass used after training
     # Input:
-    #   A random noise tensor of shape (self.sequence_length, self.embedding_size)
+    #   A random noise tensor of shape (self.sequence_length)
     # Output:
     #   A string of max length 256 words
     def forward(self, noise):
         # Put the model in test/eval mode
         self.eval()
         
-        if len(noise.shape) != 3:
+        if len(noise.shape) != 2:
             noise = torch.unsqueeze(noise, dim=0)
         
         
@@ -67,7 +69,9 @@ class Generator(nn.Module):
         #noise = torch.rand((self.batchSize, self.sequence_length, self.embedding_size), requires_grad=False)
         
         # Send the noise through the input transformers
-        Z = self.inEmb(noise)
+        #Z = self.inEmb(noise)
+        w = self.inEmb2(noise)
+        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, 10)
         
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
@@ -82,7 +86,7 @@ class Generator(nn.Module):
         
         # Get positional encodings for all tokens uncluding future
         # tokens that will be generated
-        posEnc = self.PositionalEncoding(torch.zeros(noise.shape, requires_grad=True))
+        posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True))
         
         # Add the positional encodings to the input tokens
         Y += posEnc[:, 0:1]
@@ -95,7 +99,7 @@ class Generator(nn.Module):
             # Send the output through the output decoder
             output = Y
             for block in self.outEmb:
-                output = block(Z[:, 0:Y.shape[1]], output)
+                output = block(w[:, 0:Y.shape[1]], output)
                 
             # Get the token from the output
             out_tok = output[:, tok-1]
@@ -137,17 +141,19 @@ class Generator(nn.Module):
     # Input:
     #   Nothing
     # Output:
-    #   A 3-D tensor of shape (N, sequence_length, vocab_size)
+    #   A 2-D tensor of shape (N, sequence_length)
     #   where the vocab_size is a softmaxed output
     def forward_train(self):
         # Put the model in train mode
         self.train()
         
         # Generate some noise
-        noise = torch.rand((self.batchSize, self.sequence_length, self.embedding_size), requires_grad=False)
+        noise = torch.rand((self.batchSize, self.sequence_length), requires_grad=False)
         
         # Send the noise through the input transformers
-        Z = self.inEmb(noise)
+        #Z = self.inEmb(noise)
+        w = self.inEmb2(noise)
+        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, 10)
         
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
@@ -162,7 +168,7 @@ class Generator(nn.Module):
         
         # Get positional encodings for all tokens uncluding future
         # tokens that will be generated
-        posEnc = self.PositionalEncoding(torch.zeros(noise.shape, requires_grad=True))
+        posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True))
         
         # Add the positional encodings to the input tokens
         Y += posEnc[:, 0:1]
@@ -175,7 +181,7 @@ class Generator(nn.Module):
             # Send the output through the output decoder
             output = Y
             for block in self.outEmb:
-                output = block(Z[:, 0:Y.shape[1]], output)
+                output = block(w[:, 0:Y.shape[1]], output)
                 
             # Get the token from the output
             out_tok = output[:, tok-1]
