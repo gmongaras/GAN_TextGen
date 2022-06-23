@@ -43,7 +43,7 @@ def main():
     N_gen = 2
     N_disc = 2
     batchSize = 10
-    embedding_size = 10
+    embedding_size = 20
     sequence_length = 128
     num_heads = 2
     alpha = 0.00005
