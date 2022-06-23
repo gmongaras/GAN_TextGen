@@ -5,6 +5,7 @@ from helpers import addPadding_one_hot
 
 
 from losses import wasserstein_disc
+from losses import wasserstein_disc_split
 from losses import wasserstein_gen
 from losses import minimax_disc
 from losses import minimax_gen
@@ -91,7 +92,8 @@ class Model(nn.Module):
         
         # Save loss values over training for the loss plot
         self.genLoss = []
-        self.discLoss = []
+        self.discLoss_real = []
+        self.discLoss_fake = []
         
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
@@ -137,6 +139,8 @@ class Model(nn.Module):
                 # Get the discriminator loss
                 #discLoss = minimax_disc(disc_real, disc_fake)
                 discLoss = wasserstein_disc(disc_real, disc_fake)
+                
+                discLoss_real, discLoss_fake = wasserstein_disc_split(disc_real, disc_fake)
                 
                 # Backpropogate the loss
                 discLoss.backward()
@@ -198,13 +202,16 @@ class Model(nn.Module):
             # Convert the losses. If the loss should be maximized,
             # multiply by a negative to get the actual value
             genLoss = genLoss*-1
-            discLoss = discLoss*-1
+            #discLoss = discLoss*-1
+            discLoss_real *= -1
+            discLoss_fake *= -1
                 
             # Save the loss values
             self.genLoss.append(genLoss.item())
-            self.discLoss.append(discLoss.item())
+            self.discLoss_real.append(discLoss_real.item())
+            self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 2)}     Discriminator Loss: {round(discLoss.item(), 2)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 2)}     Discriminator Loss Real: {round(discLoss_real.item(), 2)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 2)}\n")
             
             # Iterate until the number of items in the list
             # is lower than the batch num
@@ -274,13 +281,14 @@ class Model(nn.Module):
             if self.trainGraphFile:
                 fix, ax = plt.subplots()
                 ax.plot([i for i in range(len(self.genLoss))], self.genLoss, label="Gen loss")
-                ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss")
+                ax.plot([i for i in range(len(self.discLoss_real))], self.discLoss_real, label="Disc loss real")
+                ax.plot([i for i in range(len(self.discLoss_fake))], self.discLoss_fake, label="Disc loss fake")
+                #ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss")
                 ax.set_title("Gen and disc loss over epochs")
                 ax.set_xlabel("Epochs")
                 ax.set_ylabel("Loss")
                 ax.legend()
                 plt.savefig(self.trainGraphFile)
-                print()
     
     # Load the models
     def loadModels(self, loadDir, genFile, discFile):

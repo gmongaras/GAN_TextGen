@@ -15,6 +15,9 @@ import torch
 def wasserstein_disc(disc_real, disc_fake):
     return -(torch.mean(disc_real - disc_fake))
 
+def wasserstein_disc_split(disc_real, disc_fake):
+    return -torch.mean(disc_real), torch.mean(disc_fake)
+
 # In this loss function, we want to maximize the score of the
 # critic when the critic is given fake data. Since the critic
 # classifies real data with a larger score, we want the generator
