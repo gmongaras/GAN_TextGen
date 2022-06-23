@@ -71,7 +71,7 @@ class Generator(nn.Module):
         # Send the noise through the input transformers
         #Z = self.inEmb(noise)
         w = self.inEmb2(noise)
-        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, 10)
+        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.sequence_length)
         
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
@@ -153,7 +153,7 @@ class Generator(nn.Module):
         # Send the noise through the input transformers
         #Z = self.inEmb(noise)
         w = self.inEmb2(noise)
-        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, 10)
+        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.sequence_length)
         
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
