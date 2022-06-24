@@ -8,15 +8,15 @@ import torch
 # difference between the fake and real classifications.
 # For the critic loss, predictions are not between 0 and 1. So,
 # maximizing this loss makes the critic give a larger score to
-# real data and a smaller score for fake data.
+# fake data and a smaller score for real data.
 # Inputs:
 #   disc_real - Discriminator output on real data
 #   disc_fake - Discriminator output on fake data
 def wasserstein_disc(disc_real, disc_fake):
-    return -(torch.mean(disc_real - disc_fake))
+    return torch.mean(disc_real - disc_fake)
 
 def wasserstein_disc_split(disc_real, disc_fake):
-    return -torch.mean(disc_real), torch.mean(disc_fake)
+    return torch.mean(disc_real), -torch.mean(disc_fake)
 
 # In this loss function, we want to maximize the score of the
 # critic when the critic is given fake data. Since the critic

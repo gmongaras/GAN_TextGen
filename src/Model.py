@@ -108,6 +108,7 @@ class Model(nn.Module):
             gen_nums = torch.randperm(len(X_orig))
             
             # Train the discriminator first
+            self.optim_disc.zero_grad()
             for i in range(0, max(self.trainingRatio[1], 1)):
                 # Sample the data to get data the generator and
                 # discriminator will see
@@ -151,9 +152,13 @@ class Model(nn.Module):
                 
                 # Step the optimizer
                 self.optim_disc.step()
-                self.optim_disc.zero_grad()
+                
+                # clip weights of discriminator
+                for p in self.discriminator.parameters():
+                    p.data.clamp_(-0.01, 0.01)
             
             # Train the generator next
+            self.optim_gen.zero_grad()
             for i in range(0, max(self.trainingRatio[0], 1)):
                 # Get subset indices of the data for the generator
                 # and discriminator
