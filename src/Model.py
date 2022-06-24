@@ -40,13 +40,14 @@ class Model(nn.Module):
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
     #                never decrease the ratio
     #   alpha - Learning rate of the model
+    #   clip_val - Value to clip the discriminator parameters at (-1 for no clip)
     #   device - Device to put the model on
     #   saveSteps - Number of steps until the model is saved
     #   saveDir - Directory to save the model to
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, clip_val, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
         super(Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -59,6 +60,7 @@ class Model(nn.Module):
         self.batchSize = batchSize
         self.trainingRatio = trainingRatio
         self.decRatRate = decRatRate
+        self.clip_val = clip_val
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -147,15 +149,13 @@ class Model(nn.Module):
                 # Backpropogate the loss
                 discLoss.backward()
                 
-                # Clip the gradients
-                torch.nn.utils.clip_grad_value_(self.parameters(), 0.01)
-                
                 # Step the optimizer
                 self.optim_disc.step()
                 
                 # clip weights of discriminator
-                for p in self.discriminator.parameters():
-                    p.data.clamp_(-0.01, 0.01)
+                if self.clip_val > 0:
+                    for p in self.discriminator.parameters():
+                        p.data.clamp_(-self.clip_val, self.clip_val)
             
             # Train the generator next
             self.optim_gen.zero_grad()
@@ -207,10 +207,10 @@ class Model(nn.Module):
                 
             # Convert the losses. If the loss should be maximized,
             # multiply by a negative to get the actual value
-            genLoss = genLoss*-1
-            discLoss = discLoss*-1
-            discLoss_real *= -1
-            discLoss_fake *= -1
+            # genLoss = genLoss*-1
+            # discLoss = discLoss*-1
+            # discLoss_real *= -1
+            # discLoss_fake *= -1
                 
             # Save the loss values
             self.genLoss.append(genLoss.item())
