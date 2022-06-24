@@ -92,6 +92,7 @@ class Model(nn.Module):
         
         # Save loss values over training for the loss plot
         self.genLoss = []
+        self.discLoss = []
         self.discLoss_real = []
         self.discLoss_fake = []
         
@@ -202,12 +203,13 @@ class Model(nn.Module):
             # Convert the losses. If the loss should be maximized,
             # multiply by a negative to get the actual value
             genLoss = genLoss*-1
-            #discLoss = discLoss*-1
+            discLoss = discLoss*-1
             discLoss_real *= -1
             discLoss_fake *= -1
                 
             # Save the loss values
             self.genLoss.append(genLoss.item())
+            self.discLoss.append(discLoss.item())
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
@@ -283,12 +285,14 @@ class Model(nn.Module):
                 ax.plot([i for i in range(len(self.genLoss))], self.genLoss, label="Gen loss")
                 ax.plot([i for i in range(len(self.discLoss_real))], self.discLoss_real, label="Disc loss real")
                 ax.plot([i for i in range(len(self.discLoss_fake))], self.discLoss_fake, label="Disc loss fake")
+                ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss combined")
                 #ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss")
                 ax.set_title("Gen and disc loss over epochs")
                 ax.set_xlabel("Epochs")
                 ax.set_ylabel("Loss")
                 ax.legend()
                 plt.savefig(self.trainGraphFile)
+                plt.close()
     
     # Load the models
     def loadModels(self, loadDir, genFile, discFile):
