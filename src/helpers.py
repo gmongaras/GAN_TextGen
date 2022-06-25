@@ -69,6 +69,10 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder):
         
         # Iterate over each word
         for word in words:
+            # If the word is blank, skip it
+            if len(word) == 0:
+                continue
+
             # Encode the word
             word_enc = encoder(torch.tensor(vocab_inv[word]))
             
@@ -115,6 +119,10 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length):
         
         # Iterate over each word
         for word in words:
+            # If the word is blank, skip it
+            if len(word) == 0:
+                continue
+            
             # Encode the word
             word_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv[word]), len(vocab_inv))
             
