@@ -23,8 +23,8 @@ def wasserstein_disc_split(disc_real, disc_fake):
 # In this loss function, we want to minimize the
 # same exact thing the discriminator wants to maximize.
 # So, we are essentially maximizing the discriminator's
-# score on fake data since it wants to minimize its
-# score on fake data
+# score on fake data since the discriminator wants to
+# minimize its score on fake data
 # Inputs:
 #   y_pred_gen - The discriminator prediction of how real it
 #                thinks the generator output is (D(G(z)))
