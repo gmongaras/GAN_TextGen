@@ -75,7 +75,7 @@ class Model(nn.Module):
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha)
-        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha)
+        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, maximize=True)
         
         
     def one_hot(a, num_classes):
@@ -218,7 +218,7 @@ class Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 2)}     Discriminator Loss Real: {round(discLoss_real.item(), 2)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 2)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
             
             # Iterate until the number of items in the list
             # is lower than the batch num

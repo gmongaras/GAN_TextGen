@@ -8,21 +8,23 @@ import torch
 # difference between the fake and real classifications.
 # For the critic loss, predictions are not between 0 and 1. So,
 # maximizing this loss makes the critic give a larger score to
-# fake data and a smaller score for real data.
+# real data and a smaller score for fake data.
+# Note: The Adam optimizer has been set to maximize
+# the discriminator loss.
 # Inputs:
 #   disc_real - Discriminator output on real data
 #   disc_fake - Discriminator output on fake data
 def wasserstein_disc(disc_real, disc_fake):
-    return torch.mean(disc_real - disc_fake)
+    return torch.mean(disc_real) - torch.mean(disc_fake)
 
 def wasserstein_disc_split(disc_real, disc_fake):
     return torch.mean(disc_real), -torch.mean(disc_fake)
 
-# In this loss function, we want to maximize the score of the
-# critic when the critic is given fake data. Since the critic
-# classifies real data with a larger score, we want the generator
-# to make data that's more real, so it'll maximize the
-# value the discriminator gives.
+# In this loss function, we want to minimize the
+# same exact thing the discriminator wants to maximize.
+# So, we are essentially maximizing the discriminator's
+# score on fake data since it wants to minimize its
+# score on fake data
 # Inputs:
 #   y_pred_gen - The discriminator prediction of how real it
 #                thinks the generator output is (D(G(z)))
