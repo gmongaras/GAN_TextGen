@@ -47,6 +47,8 @@ def main():
     sequence_length = 128
     num_heads = 2
     alpha = 0.0001
+    Beta1 = 0 # Adam beta 1 term
+    Beta2 = 0.9 # Adam beta 2 term
     Lambda = 10 # Lambda value used for gradient penalty in disc loss
     device = torch.device("cpu")
     epochs = 50
@@ -58,8 +60,8 @@ def main():
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                   embedding_size, sequence_length, num_heads,
                   trainingRatio, decRatRate, alpha, Lambda,
-                  device, saveSteps, saveDir, genSaveFile, 
-                  discSaveFile, trainGraphFile)
+                  Beta1, Beta2, device, saveSteps, saveDir, 
+                  genSaveFile, discSaveFile, trainGraphFile)
     
     
     ### Training The Model ###

@@ -41,13 +41,15 @@ class Model(nn.Module):
     #                never decrease the ratio
     #   alpha - Learning rate of the model
     #   Lambda - Lambda value used for gradient penalty in disc loss
+    #   Beta1 - Adam beta 1 term
+    #   Beta2 - Adam beta 2 term
     #   device - Device to put the model on
     #   saveSteps - Number of steps until the model is saved
     #   saveDir - Directory to save the model to
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, Lambda, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
         super(Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -75,8 +77,8 @@ class Model(nn.Module):
         self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads)
         
         # The optimizer for the model
-        self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha)
-        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, maximize=True)
+        self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
+        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, betas=[Beta1, Beta2], maximize=True)
         
         
     def one_hot(a, num_classes):
