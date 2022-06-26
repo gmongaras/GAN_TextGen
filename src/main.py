@@ -29,7 +29,7 @@ def main():
     sentences = []
     with open(input_file, "r") as file:
         for line in file:
-            sentences.append(line.strip())
+            sentences.append("<START> " + line.strip())
     
     
     ### Load in the vocab ###    
@@ -46,8 +46,8 @@ def main():
     embedding_size = 20
     sequence_length = 128
     num_heads = 2
-    alpha = 0.00005
-    clip_val = -1 # Value to clip the discriminator paramters at (-1 for no clip)
+    alpha = 0.0001
+    Lambda = 10 # Lambda value used for gradient penalty in disc loss
     device = torch.device("cpu")
     epochs = 50
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
@@ -57,7 +57,7 @@ def main():
     # Create the model
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                   embedding_size, sequence_length, num_heads,
-                  trainingRatio, decRatRate, alpha, clip_val,
+                  trainingRatio, decRatRate, alpha, Lambda,
                   device, saveSteps, saveDir, genSaveFile, 
                   discSaveFile, trainGraphFile)
     

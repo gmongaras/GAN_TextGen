@@ -89,7 +89,9 @@ class Generator(nn.Module):
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True))
         
         # Add the positional encodings to the input tokens
-        Y += posEnc[:, 0:1]
+        t = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
+        t = t.float()
+        out_sent = [[t] for i in range(self.batchSize)]
         
         # The tokenzied output sentences
         out_sent = [[] for i in range(self.batchSize)]
@@ -141,7 +143,7 @@ class Generator(nn.Module):
     # Input:
     #   Nothing
     # Output:
-    #   A 2-D tensor of shape (N, sequence_length)
+    #   A 3-D tensor of shape (N, sequence_length, vocab_size)
     #   where the vocab_size is a softmaxed output
     def forward_train(self):
         # Put the model in train mode
@@ -174,7 +176,10 @@ class Generator(nn.Module):
         Y += posEnc[:, 0:1]
         
         # The tokenzied output sentences
-        out_sent = [[] for i in range(self.batchSize)]
+        t = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
+        t = t.float()
+        t.requires_grad = True
+        out_sent = [[t] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):

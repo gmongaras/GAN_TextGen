@@ -40,14 +40,14 @@ class Model(nn.Module):
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
     #                never decrease the ratio
     #   alpha - Learning rate of the model
-    #   clip_val - Value to clip the discriminator parameters at (-1 for no clip)
+    #   Lambda - Lambda value used for gradient penalty in disc loss
     #   device - Device to put the model on
     #   saveSteps - Number of steps until the model is saved
     #   saveDir - Directory to save the model to
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, clip_val, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, alpha, Lambda, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
         super(Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -60,7 +60,8 @@ class Model(nn.Module):
         self.batchSize = batchSize
         self.trainingRatio = trainingRatio
         self.decRatRate = decRatRate
-        self.clip_val = clip_val
+        self.Lambda = Lambda
+        self.device = device
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -79,7 +80,37 @@ class Model(nn.Module):
         
         
     def one_hot(a, num_classes):
-      return np.squeeze(np.eye(num_classes)[a.reshape(-1)])
+        return np.squeeze(np.eye(num_classes)[a.reshape(-1)])
+    
+    
+    # For WGAN-GP loss, we need a gradient penalty to add
+    # to the discriminator loss. This function gets that
+    # penalty
+    # Inputs:
+    #   x - A sample of real data
+    #   x_tilde - A sample of data from the generator
+    def get_gradient_penalty(self, x, x_tilde):
+        # Sample a uniform distribution to get a random number, epsilon
+        epsilon = torch.rand((self.batchSize, 1, 1), requires_grad=True)
+        epsilon = epsilon.expand(x.shape)
+        
+        # Create a new tensor fo the same shape as the real and fake data
+        x_hat = epsilon*x + (1-epsilon)*x_tilde
+        
+        # Send the transformed and combined data through the
+        # discriminator
+        disc_x_hat = self.discriminator(x_hat)
+        
+        # Get the gradients of the discriminator output
+        use_cuda = False
+        gradients = torch.autograd.grad(outputs=disc_x_hat, inputs=x_hat,
+                              grad_outputs=torch.ones(disc_x_hat.size()).gpu() if use_cuda else torch.ones(
+                                  disc_x_hat.size()),
+                              create_graph=True, retain_graph=True, only_inputs=True)[0]
+        gradients = gradients.view(gradients.size(0), -1)
+        
+        # Get the final penalty and return it
+        return ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.Lambda
     
     
     
@@ -120,7 +151,8 @@ class Model(nn.Module):
                 gen_nums = gen_nums[self.batchSize:]
                 
                 # Generate some data from the generator
-                Y = self.generator.forward_train()
+                with torch.no_grad():
+                    Y = self.generator.forward_train()
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
@@ -140,22 +172,26 @@ class Model(nn.Module):
                 # maximize the loss
                 #discLoss = -minimax_loss(disc_real, disc_fake)
                 
+                # Get the gradient penalty
+                gradient_penalty = self.get_gradient_penalty(real_X, Y)
+                
                 # Get the discriminator loss
                 #discLoss = minimax_disc(disc_real, disc_fake)
                 discLoss = wasserstein_disc(disc_real, disc_fake)
                 
                 discLoss_real, discLoss_fake = wasserstein_disc_split(disc_real, disc_fake)
                 
-                # Backpropogate the loss
+                # Backpropogate the loss and penalty
                 discLoss.backward()
+                gradient_penalty.backward()
                 
                 # Step the optimizer
                 self.optim_disc.step()
                 
-                # clip weights of discriminator
-                if self.clip_val > 0:
-                    for p in self.discriminator.parameters():
-                        p.data.clamp_(-self.clip_val, self.clip_val)
+                # clip parameters of the discriminator
+                #if self.clip_val > 0:
+                #    for p in self.discriminator.parameters():
+                #        p.data.clamp_(-self.clip_val, self.clip_val)
             
             # Train the generator next
             self.optim_gen.zero_grad()
