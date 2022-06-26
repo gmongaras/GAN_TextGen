@@ -89,12 +89,11 @@ class Generator(nn.Module):
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True))
         
         # Add the positional encodings to the input tokens
-        t = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-        t = t.float()
-        out_sent = [[t] for i in range(self.batchSize)]
+        Y += posEnc[:, 0:1]
         
         # The tokenzied output sentences
-        out_sent = [[] for i in range(self.batchSize)]
+        t = torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)
+        out_sent = [[t] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):

@@ -34,7 +34,7 @@ def get_clean_words(Sentence):
     
     # Replace any characters in the line we don't want
     for i in unwanted:
-        Sentence = Sentence.replace(i, "")
+        Sentence = Sentence.replace(i, " ")
     Sentence = Sentence.lower()
     
     # Breakup the string and return it
@@ -59,10 +59,13 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder):
     # Get the encoded form of <END>
     end_enc = encoder(torch.tensor(vocab_inv["<END>"]))
     
+    # Get the encoded form of <START>
+    start_end = encoder(torch.tensor(vocab_inv["<START>"]))
+    
     # Iterate over all sentences
     for sentence in X:
-        # List of encoded words
-        enc_words = []
+        # List of encoded words starting with <START>
+        enc_words = [start_end]
         
         # Get the words from the sentence
         words = get_clean_words(sentence)
@@ -109,10 +112,13 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length):
     # Get the encoded form of <END>
     end_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
     
+    # Get the encoded form of <START>
+    start_end = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<START>"]), len(vocab_inv))
+    
     # Iterate over all sentences
     for sentence in X:
-        # List of encoded words
-        enc_words = []
+        # List of encoded words starting with <START>
+        enc_words = [start_end]
         
         # Get the words from the sentence
         words = get_clean_words(sentence)

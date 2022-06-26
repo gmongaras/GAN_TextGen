@@ -29,7 +29,7 @@ def main():
     sentences = []
     with open(input_file, "r") as file:
         for line in file:
-            sentences.append("<START> " + line.strip())
+            sentences.append(line.strip())
     
     
     ### Load in the vocab ###    
