@@ -101,7 +101,7 @@ class Model(nn.Module):
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
-        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, betas=[Beta1, Beta2], maximize=True)
+        self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, betas=[Beta1, Beta2])
         
         
     def one_hot(a, num_classes):
@@ -126,13 +126,14 @@ class Model(nn.Module):
         
         # Create a new tensor fo the same shape as the real and fake data
         x_hat = epsilon*x + (1-epsilon)*x_tilde
+        x_hat = x_hat.detach().clone()
+        x_hat = torch.autograd.Variable(x_hat, requires_grad=True)
         
         # Send the transformed and combined data through the
         # discriminator
         disc_x_hat = self.discriminator(x_hat)
         
         # Get the gradients of the discriminator output
-        use_cuda = False
         gradients = torch.autograd.grad(outputs=disc_x_hat, inputs=x_hat,
                               grad_outputs=torch.ones(disc_x_hat.size(), device=device),
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
@@ -212,10 +213,12 @@ class Model(nn.Module):
                 discLoss = wasserstein_disc(disc_real, disc_fake)
                 
                 discLoss_real, discLoss_fake = wasserstein_disc_split(disc_real, disc_fake)
+
+                # The cost of the discriminator is the loss + the penalty
+                discCost = discLoss + gradient_penalty
                 
-                # Backpropogate the loss and penalty
-                discLoss.backward()
-                gradient_penalty.backward()
+                # Backpropogate the cost
+                discCost.backward()
                 
                 # Step the optimizer
                 self.optim_disc.step()
@@ -227,7 +230,7 @@ class Model(nn.Module):
                 #        p.data.clamp_(-self.clip_val, self.clip_val)
 
                 # Delete all discriminator stuff as its no longer needed
-                del disc_sub, disc_fake, real_X, gradient_penalty, disc_real
+                del disc_sub, disc_fake, real_X, gradient_penalty, disc_real, discLoss
             
             # Train the generator next
             self.optim_gen.zero_grad()
@@ -272,11 +275,11 @@ class Model(nn.Module):
                 
             # Save the loss values
             self.genLoss.append(genLoss.item())
-            self.discLoss.append(discLoss.item())
+            self.discLoss.append(discCost.item())
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discCost.item(), 4)}\n")
     
     
     
