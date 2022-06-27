@@ -50,17 +50,21 @@ def get_clean_words(Sentence):
 #   sequence_length - Length to encode each sequence to
 #   encoder - Encoder object that excepts a word as
 #             input and returns a vector form of that word
+#   device - Device to put the tensors on
 # Output:
 #   A list of the same size with encoded sentences as tensors
-def encode_sentences(X, vocab_inv, sequence_length, encoder):
+def encode_sentences(X, vocab_inv, sequence_length, encoder, device):
+    # Get the encoder on the correct device
+    encoder.to(device)
+
     # Final tensor of encoded sentences
     encoded = []
     
     # Get the encoded form of <END>
-    end_enc = encoder(torch.tensor(vocab_inv["<END>"]))
+    end_enc = encoder(torch.tensor(vocab_inv["<END>"], device=device))
     
     # Get the encoded form of <START>
-    start_end = encoder(torch.tensor(vocab_inv["<START>"]))
+    start_end = encoder(torch.tensor(vocab_inv["<START>"], device=device))
     
     # Iterate over all sentences
     for sentence in X:
@@ -77,7 +81,7 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder):
                 continue
 
             # Encode the word
-            word_enc = encoder(torch.tensor(vocab_inv[word]))
+            word_enc = encoder(torch.tensor(vocab_inv[word], device=device))
             
             # Save the encoded word
             enc_words.append(word_enc)
@@ -90,7 +94,7 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder):
             continue
         
         # Turn the encoded words into a list and save it
-        encoded.append(torch.stack(enc_words).detach())
+        encoded.append(torch.stack(enc_words).detach().to(device))
     
     
     # Return the list of encoded sentences
@@ -103,9 +107,10 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder):
 #   X - list of Strings where each string is a cleaned
 #   vocab_inv - Inverted vocab where words map to their values
 #   sequence_length - Length to encode each sequence to
+#   device - Device to put the tensors on
 # Output:
 #   A list of the same size with encoded sentences as tensors
-def encode_sentences_one_hot(X, vocab_inv, sequence_length):
+def encode_sentences_one_hot(X, vocab_inv, sequence_length, device):
     # Final tensor of encoded sentences
     encoded = []
     
@@ -128,7 +133,7 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length):
             # If the word is blank, skip it
             if len(word) == 0:
                 continue
-            
+
             # Encode the word
             word_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv[word]), len(vocab_inv))
             
@@ -143,7 +148,7 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length):
             continue
         
         # Turn the encoded words into a list and save it
-        encoded.append(torch.stack(enc_words).detach())
+        encoded.append(torch.stack(enc_words).detach().to(device))
     
     
     # Return the list of encoded sentences

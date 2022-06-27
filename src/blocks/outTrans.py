@@ -16,23 +16,25 @@ class outTrans(nn.Module):
     #   num_heads - Number of heads in each MHA block
     #   FF_embedding - embedding size of the output of the
     #                  Feed-forward block
-    def __init__(self, E_1, E_2, num_heads, FF_embedding):
+    #   device - Device to put tensors on
+    def __init__(self, E_1, E_2, num_heads, FF_embedding, device):
         super(outTrans, self).__init__()
+        self.device = device
         
         # The first MHA module with a mask
-        self.MHA1 = MHA(E_2, E_2, E_2, num_heads, True)
+        self.MHA1 = MHA(E_2, E_2, E_2, num_heads, True).to(device)
         
         # Second MHA module without a mask and with an
         # input from a different source
-        self.MHA2 = MHA(E_1, E_2, E_2, num_heads)
+        self.MHA2 = MHA(E_1, E_2, E_2, num_heads).to(device)
         
         # Feed-foward block after the MHA blocks
-        self.FF = nn.Linear(E_2, FF_embedding)
+        self.FF = nn.Linear(E_2, FF_embedding, device=device)
         
         # Layer normalization blocks
-        self.LN1 = nn.LayerNorm(E_2)
-        self.LN2 = nn.LayerNorm(E_2)
-        self.LN3 = nn.LayerNorm(FF_embedding)
+        self.LN1 = nn.LayerNorm(E_2, device=device)
+        self.LN2 = nn.LayerNorm(E_2, device=device)
+        self.LN3 = nn.LayerNorm(FF_embedding, device=device)
     
     
     # Input:
@@ -45,7 +47,7 @@ class outTrans(nn.Module):
         X += X_2
         X = self.LN1(X)
         
-        noise = torch.rand((X.shape), requires_grad=True)
+        noise = torch.rand((X.shape), requires_grad=True, device=self.device)
         X += noise
         
         X_saved = X.clone()

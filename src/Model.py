@@ -22,6 +22,11 @@ import matplotlib.pyplot as plt
 
 
 
+cpu = torch.device('cpu')
+gpu = torch.device('cuda:0')
+
+
+
 
 
 class Model(nn.Module):
@@ -63,7 +68,6 @@ class Model(nn.Module):
         self.trainingRatio = trainingRatio
         self.decRatRate = decRatRate
         self.Lambda = Lambda
-        self.device = device
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -71,10 +75,29 @@ class Model(nn.Module):
         self.genSaveFile = genSaveFile
         self.discSaveFile = discSaveFile
         self.trainGraphFile = trainGraphFile
+
+        # Convert the device to a torch device
+        if device.lower() == "fullgpu":
+            if torch.cuda.is_available():
+                dev = device.lower()
+                device = torch.device('cuda:0')
+            else:
+                dev = "cpu"
+                print("GPU not available, defaulting to CPU. Please ignore this message if you do not wish to use a GPU\n")
+                device = torch.device('cpu')
+        else:
+            dev = device.lower()
+            device = torch.device('cpu')
+        self.device = device
+        self.dev = dev
         
         # The generator and discriminator models
-        self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, device)
-        self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads)
+        if self.dev != "cpu":
+            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, gpu)
+            self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, gpu)
+        else:
+            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, device)
+            self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, device)
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
@@ -92,8 +115,13 @@ class Model(nn.Module):
     #   x - A sample of real data
     #   x_tilde - A sample of data from the generator
     def get_gradient_penalty(self, x, x_tilde):
+        # Get the device
+        device = self.device
+        if self.dev == "partgpu":
+            device = gpu
+
         # Sample a uniform distribution to get a random number, epsilon
-        epsilon = torch.rand((self.batchSize, 1, 1), requires_grad=True)
+        epsilon = torch.rand((self.batchSize, 1, 1), requires_grad=True, device=device)
         epsilon = epsilon.expand(x.shape)
         
         # Create a new tensor fo the same shape as the real and fake data
@@ -106,8 +134,7 @@ class Model(nn.Module):
         # Get the gradients of the discriminator output
         use_cuda = False
         gradients = torch.autograd.grad(outputs=disc_x_hat, inputs=x_hat,
-                              grad_outputs=torch.ones(disc_x_hat.size()).gpu() if use_cuda else torch.ones(
-                                  disc_x_hat.size()),
+                              grad_outputs=torch.ones(disc_x_hat.size(), device=device),
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
         gradients = gradients.view(gradients.size(0), -1)
         
@@ -122,8 +149,8 @@ class Model(nn.Module):
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
         # Encode the sentences
-        X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec), dtype=object)
-        X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length), dtype=object)
+        X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec, self.device), dtype=object)
+        X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.device), dtype=object)
         
         # Save loss values over training for the loss plot
         self.genLoss = []
@@ -139,8 +166,8 @@ class Model(nn.Module):
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
-            disc_nums = torch.randperm(len(X_orig))
-            gen_nums = torch.randperm(len(X_orig))
+            disc_nums = torch.randperm(len(X_orig), device=self.device)
+            gen_nums = torch.randperm(len(X_orig), device=self.device)
             
             # Train the discriminator first
             self.optim_disc.zero_grad()
@@ -149,8 +176,11 @@ class Model(nn.Module):
                 # discriminator will see
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
-                gen_sub = gen_nums[:self.batchSize]
-                gen_nums = gen_nums[self.batchSize:]
+
+                # Put the data on the correct device
+                if self.dev == "partgpu":
+                    disc_sub = disc_sub.to(gpu)
+                    disc_nums = disc_nums.to(gpu)
                 
                 # Generate some data from the generator
                 with torch.no_grad():
@@ -161,21 +191,22 @@ class Model(nn.Module):
                 disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
                 
                 # Get a real data subset using one_hot encoding
-                real_X = X_orig_one_hot[disc_sub.detach().numpy()]
+                real_X = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
                 
                 # Add padding to the subset
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
+                if self.dev == "partgpu":
+                    real_X = real_X.to(gpu)
+
+                # Get the gradient penalty
+                gradient_penalty = self.get_gradient_penalty(real_X, Y)
+
+                # We don't need the generot output anymore
+                del Y
                 
                 # Send the real output throuh the discriminator to
                 # get a batch of predictions on the real sentences
                 disc_real = torch.squeeze(self.discriminator(real_X)) # Predictions
-                
-                # Get the discriminator loss. Negative to
-                # maximize the loss
-                #discLoss = -minimax_loss(disc_real, disc_fake)
-                
-                # Get the gradient penalty
-                gradient_penalty = self.get_gradient_penalty(real_X, Y)
                 
                 # Get the discriminator loss
                 #discLoss = minimax_disc(disc_real, disc_fake)
@@ -202,8 +233,11 @@ class Model(nn.Module):
                 # and discriminator
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
-                gen_sub = gen_nums[:self.batchSize]
-                gen_nums = gen_nums[self.batchSize:]
+
+                # Put the data on the correct device
+                if self.dev == "partgpu":
+                    disc_sub = disc_sub.to(gpu)
+                    disc_nums = disc_nums.to(gpu)
                 
                 # Generate some data from the generator
                 Y = self.generator.forward_train()
@@ -211,20 +245,6 @@ class Model(nn.Module):
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
                 disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
-                
-                # Get a real data subset using one_hot encoding
-                #real_X = X_orig_one_hot[disc_sub.detach().numpy()]
-                
-                # Add padding to the subset
-                #real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
-                
-                # Send the real output throuh the discriminator to
-                # get a batch of predictions on the real sentences
-                #disc_real = torch.squeeze(self.discriminator(real_X)) # Predictions
-                
-                # Get the generator loss. Positive to
-                # minimize the loss
-                #genLoss = minimax_loss(disc_real, disc_fake)
                 
                 # Get the generator loss
                 #genLoss = minimax_gen(disc_fake)
@@ -239,16 +259,10 @@ class Model(nn.Module):
             
             
             # Decrease the rate
-            if epochs%self.decRatRate == 0 and self.decRatRate > 0:
-                self.trainingRatio[0] -= 1
-                self.trainingRatio[1] -= 1
-                
-            # Convert the losses. If the loss should be maximized,
-            # multiply by a negative to get the actual value
-            # genLoss = genLoss*-1
-            # discLoss = discLoss*-1
-            # discLoss_real *= -1
-            # discLoss_fake *= -1
+            if self.decRatRate > 0:
+                if epochs%self.decRatRate == 0 and self.decRatRate > 0:
+                    self.trainingRatio[0] -= 1
+                    self.trainingRatio[1] -= 1
                 
             # Save the loss values
             self.genLoss.append(genLoss.item())
@@ -257,54 +271,6 @@ class Model(nn.Module):
             self.discLoss_fake.append(discLoss_fake.item())
             
             print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
-            
-            # Iterate until the number of items in the list
-            # is lower than the batch num
-            # while disc_nums.shape[0] >= self.batchSize and gen_nums.shape[0] >= self.batchSize:
-            #     # Get subset indices of the data for the generator
-            #     # and discriminator
-            #     disc_sub = disc_nums[:self.batchSize]
-            #     disc_nums = disc_nums[self.batchSize:]
-            #     gen_sub = gen_nums[:self.batchSize]
-            #     gen_nums = gen_nums[self.batchSize:]
-                
-            #     # Generate some data from the generator
-            #     Y = self.generator.forward_train()
-                
-            #     # Send the generated output through the discriminator
-            #     # to get a batch of predictions on the fake sentences
-            #     y_pred_gen = torch.squeeze(self.discriminator(Y)) # Predictions
-            #     y_true_gen = torch.ones((self.batchSize)) # Labels
-                
-            #     # Get a real data subset using one_hot encoding
-            #     real_X = X_orig_one_hot[disc_sub.detach().numpy()]
-                
-            #     # Add padding to the subset
-            #     real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
-                
-            #     # Send the real output throuh the discriminator to
-            #     # get a batch of predictions on the real sentences
-            #     y_pred_real = torch.squeeze(self.discriminator(real_X)) # Predictions
-            #     y_true_real = torch.negative(torch.ones((self.batchSize))) # Labels
-                
-            #     # Combine the predictions and true labels
-            #     y_pred = torch.cat((y_pred_gen, y_pred_real))
-            #     y_true = torch.cat((y_true_gen, y_true_real))
-                
-            #     # Get the final loss for this batch
-            #     genLoss = minimax_gen(y_pred_gen)
-            #     discLoss = minimax_disc(y_true, y_pred)
-            #     loss = genLoss + discLoss
-            #     #loss = wasserstein_loss(y_true, y_pred)
-                
-            #     # Backpropogate the loss
-            #     loss.backward()
-                
-            #     # Step the optimizer
-            #     self.optim.step()
-            #     self.optim.zero_grad()
-                
-            #     print(loss.item())
     
     
     
@@ -325,11 +291,11 @@ class Model(nn.Module):
             
             if self.trainGraphFile:
                 fix, ax = plt.subplots()
-                ax.plot([i for i in range(len(self.genLoss))], self.genLoss, label="Gen loss")
-                ax.plot([i for i in range(len(self.discLoss_real))], self.discLoss_real, label="Disc loss real")
-                ax.plot([i for i in range(len(self.discLoss_fake))], self.discLoss_fake, label="Disc loss fake")
-                ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss combined")
-                #ax.plot([i for i in range(len(self.discLoss))], self.discLoss, label="Disc loss")
+                y = [i for i in range(1, len(self.genLoss)+1)]
+                ax.plot(y, self.genLoss, label="Gen loss")
+                ax.plot(y, self.discLoss_real, label="Disc loss real")
+                ax.plot(y, self.discLoss_fake, label="Disc loss fake")
+                ax.plot(y, self.discLoss, label="Disc loss combined")
                 ax.set_title("Gen and disc loss over epochs")
                 ax.set_xlabel("Epochs")
                 ax.set_ylabel("Loss")

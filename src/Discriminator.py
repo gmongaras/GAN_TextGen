@@ -18,32 +18,34 @@ class Discriminator(nn.Module):
     #                    sequence sentence.
     #   sequence_length - Number of words in the input sequence
     #   num_heads - Number of heads to use in the MHA block
-    def __init__(self, N, batchSize, vocab_size, embedding_size, sequence_length, num_heads):
+    def __init__(self, N, batchSize, vocab_size, embedding_size, sequence_length, num_heads, device):
         super(Discriminator, self).__init__()
+
+        self.device = device
         
         # Input linear layers to turn the input embedding size
         # (the vocab size) into the desired embedding size
-        self.LL1 = nn.Linear(vocab_size, vocab_size//10)
-        self.LL2 = nn.Linear(vocab_size//10, vocab_size//100)
-        self.LL3 = nn.Linear(vocab_size//100, vocab_size//500)
-        self.LL4 = nn.Linear(vocab_size//500, embedding_size)
+        self.LL1 = nn.Linear(vocab_size, vocab_size//10, device=device)
+        self.LL2 = nn.Linear(vocab_size//10, vocab_size//100, device=device)
+        self.LL3 = nn.Linear(vocab_size//100, vocab_size//500, device=device)
+        self.LL4 = nn.Linear(vocab_size//500, embedding_size, device=device)
         
         # Create the discriminator blocks. Note, each
         # block halves the sequence length
         blocks = [discBlock(embedding_size, sequence_length//(2**i), num_heads) for i in range(N)]
-        self.discBlocks = nn.Sequential(*blocks)
+        self.discBlocks = nn.Sequential(*blocks).to(device)
         
         # Create the class token which will be a vector of 1s
-        self.clsTok = torch.ones(batchSize, 1, embedding_size)
+        self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device)
         
         # Transformer blocks
-        self.trans1 = inTrans(embedding_size, num_heads, embedding_size)
-        self.trans2 = inTrans(embedding_size, num_heads, embedding_size)
+        self.trans1 = inTrans(embedding_size, num_heads, embedding_size).to(device)
+        self.trans2 = inTrans(embedding_size, num_heads, embedding_size).to(device)
         
         # Final feed-forward layer
-        self.out_FF = nn.Linear(embedding_size, 1)
-        self.Tanh = nn.Tanh()
-        self.Sigmoid = nn.Sigmoid()
+        self.out_FF = nn.Linear(embedding_size, 1, device=device)
+        self.Tanh = nn.Tanh().to(device)
+        self.Sigmoid = nn.Sigmoid().to(device)
     
     
     
@@ -96,4 +98,4 @@ class Discriminator(nn.Module):
     
     # Load the model
     def loadModel(self, loadDir, loadFile):
-        self.load_state_dict(torch.load(loadDir + os.sep + loadFile))
+        self.load_state_dict(torch.load(loadDir + os.sep + loadFile), map_location=self.device)

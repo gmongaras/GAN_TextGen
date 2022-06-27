@@ -20,8 +20,8 @@ def main():
     trainGraphFile = "trainGraph.png"
     
     loadDir = "models"
-    genLoadFile = "gen_model.pkl"
-    discLoadFile = "disc_model.pkl"
+    genLoadFile = "gen_model - 50.pkl"
+    discLoadFile = "disc_model - 50.pkl"
     
     
     
@@ -44,16 +44,16 @@ def main():
     N_disc = 2
     batchSize = 10
     embedding_size = 20
-    sequence_length = 128
+    sequence_length = 64
     num_heads = 2
     alpha = 0.0001
     Beta1 = 0 # Adam beta 1 term
     Beta2 = 0.9 # Adam beta 2 term
     Lambda = 10 # Lambda value used for gradient penalty in disc loss
-    device = torch.device("cpu")
-    epochs = 50
+    device = "partgpu"  # cpu, partgpu, or fullgpu
+    epochs = 50000
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
-    decRatRate = 10 # Decrease the ratio after every decRatRate steps
+    decRatRate = -1 # Decrease the ratio after every decRatRate steps (-1 for not decrease)
     saveSteps = 10 # Number of steps until the model is saved
     
     # Create the model
@@ -65,6 +65,7 @@ def main():
     
     
     ### Training The Model ###
+    #model.loadModels(loadDir, genLoadFile, discLoadFile)
     model.train_model(sentences, epochs)
     #model.loadModels(loadDir, genLoadFile, discLoadFile)
     print()
