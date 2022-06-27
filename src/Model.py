@@ -167,7 +167,6 @@ class Model(nn.Module):
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
             disc_nums = torch.randperm(len(X_orig), device=self.device)
-            gen_nums = torch.randperm(len(X_orig), device=self.device)
             
             # Train the discriminator first
             self.optim_disc.zero_grad()
@@ -220,11 +219,15 @@ class Model(nn.Module):
                 
                 # Step the optimizer
                 self.optim_disc.step()
+                self.optim_disc.zero_grad()
                 
                 # clip parameters of the discriminator
                 #if self.clip_val > 0:
                 #    for p in self.discriminator.parameters():
                 #        p.data.clamp_(-self.clip_val, self.clip_val)
+
+                # Delete all discriminator stuff as its no longer needed
+                del disc_sub, disc_fake, real_X, gradient_penalty, disc_real
             
             # Train the generator next
             self.optim_gen.zero_grad()
@@ -256,6 +259,9 @@ class Model(nn.Module):
                 # Step the optimizer
                 self.optim_gen.step()
                 self.optim_gen.zero_grad()
+            
+                # Delete all generator stuff as its no longer needed
+                del disc_sub, disc_nums, disc_fake, Y
             
             
             # Decrease the rate
