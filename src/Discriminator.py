@@ -98,4 +98,4 @@ class Discriminator(nn.Module):
     
     # Load the model
     def loadModel(self, loadDir, loadFile):
-        self.load_state_dict(torch.load(loadDir + os.sep + loadFile), map_location=self.device)
+        self.load_state_dict(torch.load(loadDir + os.sep + loadFile, map_location=self.device))
