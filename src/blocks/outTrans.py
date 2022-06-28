@@ -30,6 +30,7 @@ class outTrans(nn.Module):
         
         # Feed-foward block after the MHA blocks
         self.FF = nn.Linear(E_2, FF_embedding, device=device)
+        self.ReLU = nn.ReLU()
         
         # Layer normalization blocks
         self.LN1 = nn.LayerNorm(E_2, device=device)
@@ -57,6 +58,7 @@ class outTrans(nn.Module):
         
         X_saved = X.clone()
         X = self.FF(X)
+        X = self.ReLU(X)
         X += X_saved
         X = self.LN3(X)
         return X

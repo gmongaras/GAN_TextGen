@@ -11,14 +11,18 @@ class discBlock(nn.Module):
     #                    this block
     #   sequence_length - The length of the sequence as input
     #   num_heads - Number of heads in the MHA module
-    def __init__(self, embedding_size, sequence_length, num_heads):
+    #   pooling - What pooling mode should be used? ("avg", "max", or "none")
+    def __init__(self, embedding_size, sequence_length, num_heads, pooling):
         super(discBlock, self).__init__()
         
         # The transformer block
         self.trans = inTrans(embedding_size, num_heads, embedding_size)
         
         # Average pooling layer to
-        self.pool = nn.AdaptiveAvgPool1d(sequence_length//2)
+        if pooling == "max":
+            self.pool = nn.MaxPool1d(kernel_size=2) # Pool across 2 words
+        elif pooling == "avg":
+            self.pool = nn.AvgPool1d(kernel_size=2)
     
     
     
@@ -27,6 +31,7 @@ class discBlock(nn.Module):
     # Output:
     #   3-D tensor of shape (N, S//2, 2)
     def forward(self, X):
-        X = self.trans(X).permute(0, 2, 1)
-        X = self.pool(X)
-        return X.permute(0, 2, 1)
+        X = self.trans(X)
+        if hasattr(self, 'pool'):
+            X = self.pool(X.permute(0, 2, 1)).permute(0, 2, 1)
+        return X

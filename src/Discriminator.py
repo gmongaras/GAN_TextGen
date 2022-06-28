@@ -18,7 +18,9 @@ class Discriminator(nn.Module):
     #                    sequence sentence.
     #   sequence_length - Number of words in the input sequence
     #   num_heads - Number of heads to use in the MHA block
-    def __init__(self, N, batchSize, vocab_size, embedding_size, sequence_length, num_heads, device):
+    #   pooling - What pooling mode should be used? ("avg", "max", or "none")
+    #   device - Device to put the model on
+    def __init__(self, N, batchSize, vocab_size, embedding_size, sequence_length, num_heads, pooling, device):
         super(Discriminator, self).__init__()
 
         self.device = device
@@ -32,7 +34,10 @@ class Discriminator(nn.Module):
         
         # Create the discriminator blocks. Note, each
         # block halves the sequence length
-        blocks = [discBlock(embedding_size, sequence_length//(2**i), num_heads) for i in range(N)]
+        if pooling == "avg" or pooling == "max":
+            blocks = [discBlock(embedding_size, sequence_length//(2**i), num_heads, pooling) for i in range(N)]
+        else:
+            blocks = [discBlock(embedding_size, sequence_length, num_heads, pooling) for i in range(N)]
         self.discBlocks = nn.Sequential(*blocks).to(device)
         
         # Create the class token which will be a vector of 1s

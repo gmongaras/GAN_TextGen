@@ -46,11 +46,12 @@ def main():
     embedding_size = 20
     sequence_length = 64
     num_heads = 2
+    pooling = "avg" # Pooling mode for th discriminator blocks ("avg", "max", or "none")
     alpha = 0.0001
     Beta1 = 0 # Adam beta 1 term
     Beta2 = 0.9 # Adam beta 2 term
     Lambda = 10 # Lambda value used for gradient penalty in disc loss
-    device = "partgpu"  # cpu, partgpu, or fullgpu
+    device = "cpu"  # cpu, partgpu, or fullgpu
     epochs = 50000
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = -1 # Decrease the ratio after every decRatRate steps (-1 for not decrease)
@@ -59,7 +60,7 @@ def main():
     # Create the model
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                   embedding_size, sequence_length, num_heads,
-                  trainingRatio, decRatRate, alpha, Lambda,
+                  trainingRatio, decRatRate, pooling, alpha, Lambda,
                   Beta1, Beta2, device, saveSteps, saveDir, 
                   genSaveFile, discSaveFile, trainGraphFile)
     

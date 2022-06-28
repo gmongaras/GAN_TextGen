@@ -179,7 +179,7 @@ def addPadding(X, vocab_inv, sequence_length, encoder):
         pad_tensor = torch.broadcast_to(pad_enc, (pad, pad_enc.shape[-1]))
         
         # Add the pad tokens to the sentence
-        sentence = torch.cat((sentence, pad_tensor.to(setence.device)))
+        sentence = torch.cat((sentence, pad_tensor.to(sentence.device)))
         
         # Save the new sentence
         X_padded[i] = sentence

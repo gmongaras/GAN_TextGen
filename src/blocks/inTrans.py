@@ -21,6 +21,7 @@ class inTrans(nn.Module):
         
         # Feed-foward block after the MHA blocks
         self.FF = nn.Linear(E, FF_embedding)
+        self.ReLU = nn.ReLU()
         
         # Layer normalization blocks
         self.LN1 = nn.LayerNorm(E)
@@ -38,6 +39,7 @@ class inTrans(nn.Module):
         
         X_saved = X.clone()
         X = self.FF(X)
+        X = self.ReLU(X)
         X += X_saved
         X = self.LN2(X)
         return X
