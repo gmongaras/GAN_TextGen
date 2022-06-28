@@ -181,6 +181,9 @@ class Model(nn.Module):
                 if self.dev == "partgpu":
                     disc_sub = disc_sub.to(gpu)
                     disc_nums = disc_nums.to(gpu)
+                else:
+                    disc_sub = disc_sub.to(self.device)
+                    disc_nums = disc_nums.to(self.device)
                 
                 # Generate some data from the generator
                 with torch.no_grad():
@@ -197,11 +200,13 @@ class Model(nn.Module):
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
                 if self.dev == "partgpu":
                     real_X = real_X.to(gpu)
+                else:
+                    real_X = real_X.to(self.device)
 
                 # Get the gradient penalty
                 gradient_penalty = self.get_gradient_penalty(real_X, Y)
 
-                # We don't need the generot output anymore
+                # We don't need the generated output anymore
                 del Y
                 
                 # Send the real output throuh the discriminator to
@@ -244,6 +249,9 @@ class Model(nn.Module):
                 if self.dev == "partgpu":
                     disc_sub = disc_sub.to(gpu)
                     disc_nums = disc_nums.to(gpu)
+                else:
+                    disc_sub = disc_sub.to(self.device)
+                    disc_nums = disc_nums.to(self.device)
                 
                 # Generate some data from the generator
                 Y = self.generator.forward_train()
