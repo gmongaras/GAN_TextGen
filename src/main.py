@@ -47,7 +47,7 @@ def main():
     sequence_length = 64
     num_heads = 2
     pooling = "avg" # Pooling mode for the discriminator blocks ("avg", "max", or "none")
-    embed_mode = "custom" # Embedding mode for the generator ("norm" or "custom")
+    embed_mode = "norm" # Embedding mode for the generator ("norm" or "custom")
     alpha = 0.0001
     Beta1 = 0 # Adam beta 1 term
     Beta2 = 0.9 # Adam beta 2 term

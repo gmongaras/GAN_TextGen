@@ -51,7 +51,7 @@ class Generator(nn.Module):
             self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
         
         # Positional encoding block
-        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.0, 10000000).to(device)
+        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.0, len(self.vocab)).to(device)
         
         # Softmax block for the output
         self.soft = nn.Sequential(
