@@ -17,7 +17,10 @@ class Generator(nn.Module):
     #   embedding_size - Size of each word embedding
     #   sequence_length - Max sequence length of the output sentence
     #   num_heads - Number of heads in the MHA modules
-    def __init__(self, vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, device):
+    #   embed_mode - What embedding mode should be used for the
+    #                generator? ("norm" or "custom")
+    #   device - The device to put the model on
+    def __init__(self, vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device):
         super(Generator, self).__init__()
         
         # Saved states
@@ -26,6 +29,8 @@ class Generator(nn.Module):
         self.batchSize = batchSize
         self.embedding_size = embedding_size
         self.sequence_length = sequence_length
+        embed_mode = embed_mode.lower()
+        self.embed_mode = embed_mode if (embed_mode == "norm" or embed_mode == "custom") else "norm"
         self.device = device
         
         # Input embedding (noise to some sort of embedding)
@@ -37,11 +42,15 @@ class Generator(nn.Module):
         # Output Embedding (<Start> to some output sequence)
         self.outEmb = nn.ModuleList([outTrans(embedding_size, embedding_size, num_heads, embedding_size, device) for i in range(N)]).to(device)
         
-        # Used to encode each word from a number to a vector
-        self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
+        # If the embed_mode is "custom", use the custom embedding mode
+        if embed_mode == "custom":
+            self.CustomEmb = 0
+        # If the embed_mode is "norm", use Word2Vec embeddings
+        else:
+            self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
         
         # Positional encoding block
-        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.1, 100000).to(device)
+        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.0, 10000000).to(device)
         
         # Softmax block for the output
         self.soft = nn.Sequential(
@@ -77,15 +86,7 @@ class Generator(nn.Module):
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec.to(self.device)(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
         
-        # Initialize the output of the model to a bunch of <PAD> tokens
-        #Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
-        #Y = self.Word2Vec(Y) # Embed the token
-        #Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
-        
-        # Change the first token of the output to <START> tokens
-        #Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
-        
-        # Get positional encodings for all tokens uncluding future
+        # Get positional encodings for all tokens including future
         # tokens that will be generated
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
         
@@ -159,14 +160,6 @@ class Generator(nn.Module):
         
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec.to(self.device)(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
-        
-        # Initialize the output of the model to a bunch of <PAD> tokens
-        #Y = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int, device=self.device, requires_grad=False)
-        #Y = self.Word2Vec(Y) # Embed the token
-        #Y = torch.broadcast_to(Y, (self.batchSize, self.sequence_length, self.embedding_size)).clone() # Broadcast
-        
-        # Change the first token of the output to <START> tokens
-        #Y[:, 0] = self.Word2Vec(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False))
         
         # Get positional encodings for all tokens uncluding future
         # tokens that will be generated

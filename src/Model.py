@@ -45,6 +45,8 @@ class Model(nn.Module):
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
     #                never decrease the ratio
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
+    #   embed_mode - What embedding mode should be used for the
+    #                generator? ("norm" or "custom")
     #   alpha - Learning rate of the model
     #   Lambda - Lambda value used for gradient penalty in disc loss
     #   Beta1 - Adam beta 1 term
@@ -55,7 +57,7 @@ class Model(nn.Module):
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
         super(Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -94,10 +96,10 @@ class Model(nn.Module):
         
         # The generator and discriminator models
         if self.dev != "cpu":
-            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, gpu)
+            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, gpu)
             self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, gpu)
         else:
-            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, device)
+            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device)
             self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, device)
         
         # The optimizer for the model
