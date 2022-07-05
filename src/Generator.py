@@ -4,6 +4,7 @@ import os
 from blocks.inTrans import inTrans
 from blocks.outTrans import outTrans
 from blocks.PositionalEncoding import PositionalEncoding
+from blocks.CustomEmb import CustomEmb
 
 
 
@@ -44,7 +45,7 @@ class Generator(nn.Module):
         
         # If the embed_mode is "custom", use the custom embedding mode
         if embed_mode == "custom":
-            self.CustomEmb = 0
+            self.CustomEmb = CustomEmb(len(vocab.keys()), embedding_size, [len(vocab.keys())//2, len(vocab.keys())//4, len(vocab.keys()), 1000, 100], True, self.device)
         # If the embed_mode is "norm", use Word2Vec embeddings
         else:
             self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
@@ -158,10 +159,19 @@ class Generator(nn.Module):
         w = self.inEmb2(noise)
         w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.embedding_size)
         
+        # Depending on the embedding mode, pick how to
+        # Get a forward pass from the network
+        if self.embed_mode == "custom":
+            return self.forward_train_custom(w)
+        return self.forward_train_norm(w)
+    
+    
+    # Forward train using normal Word2Vec embeddings
+    def forward_train_norm(self, w):
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec.to(self.device)(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
         
-        # Get positional encodings for all tokens uncluding future
+        # Get positional encodings for all tokens including future
         # tokens that will be generated
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
         
@@ -207,6 +217,74 @@ class Generator(nn.Module):
             #Y[:, tok] = out_tok
             Y = torch.cat((Y, torch.unsqueeze(out_tok, dim=1)), dim=1)
             Y[:, tok] += posEnc[:, tok]
+        
+        # Turn the output into a tensor
+        out_sent = [torch.stack(sent) for sent in out_sent]
+        out_sent = torch.stack(out_sent)
+        
+        # Return the output
+        return out_sent
+    
+    
+    # Forward train using normal custom embeddings
+    def forward_train_custom(self, w):
+        # Initiailze the model output to <START> tokens
+        # These tokens are one-hot encoded and will be
+        # transformed during training
+        Y = torch.broadcast_to(torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab)), (self.batchSize, 1, len(self.vocab))).clone()
+        Y = Y.float()
+        Y.requires_grad = True
+        
+        # Get positional encodings for all tokens including future
+        # tokens that will be generated
+        posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
+        
+        # The tokenzied output sentences
+        t = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
+        t = t.float().to(self.device)
+        t.requires_grad = True
+        out_sent = [[t] for i in range(self.batchSize)]
+        
+        # Iterate to generate a sentence of new words
+        for tok in range(1, self.sequence_length):
+            # Create a new tensor, Y_hat which is transformed
+            # into the wanted embedding size
+            Y_hat = self.CustomEmb(Y)
+            
+            # Add positional encodings to the transformed input
+            Y_hat += posEnc[:, 0:tok]
+            
+            # Send the output through the output decoder
+            output = Y_hat
+            for block in self.outEmb:
+                output = block(w[:, 0:Y_hat.shape[1]], output)
+                
+            # Get the token from the output
+            out_tok = output[:, tok-1]
+            
+            # Send the output through a softmax block
+            out_tok_soft = self.soft(out_tok)
+            
+            # Get the argmax of the output tokens
+            out_tok = torch.argmax(out_tok_soft, dim=-1)
+            
+            # Save the softmax output
+            for i in range(self.batchSize):
+                out_sent[i].append(out_tok_soft[i])
+            #    #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
+            
+            # Encode the output token
+            out_tok = torch.nn.functional.one_hot(out_tok.long(), len(self.vocab)).float()
+            out_tok.requires_grad = True
+            
+            # Save the tokenized new word
+            #for i in range(self.batchSize):
+            #    out_sent[i].append(out_tok[i])
+            
+            # Add the new token to the output
+            #Y = Y.clone()
+            #Y[:, tok] = out_tok
+            Y = torch.cat((Y, torch.unsqueeze(out_tok, dim=1)), dim=1)
         
         # Turn the output into a tensor
         out_sent = [torch.stack(sent) for sent in out_sent]

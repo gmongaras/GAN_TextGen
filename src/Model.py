@@ -71,6 +71,7 @@ class Model(nn.Module):
         self.trainingRatio = trainingRatio
         self.decRatRate = decRatRate
         self.Lambda = Lambda
+        self.embed_mode = embed_mode
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -153,7 +154,8 @@ class Model(nn.Module):
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
         # Encode the sentences
-        X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec, self.device), dtype=object)
+        if self.embed_mode != "custom":
+            X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec, self.device), dtype=object)
         X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.device), dtype=object)
         
         # Save loss values over training for the loss plot
@@ -170,7 +172,7 @@ class Model(nn.Module):
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
-            disc_nums = torch.randperm(len(X_orig), device=self.device)
+            disc_nums = torch.randperm(len(X_orig_one_hot), device=self.device)
             
             # Train the discriminator first
             self.optim_disc.zero_grad()
