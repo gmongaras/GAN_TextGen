@@ -2,6 +2,10 @@
 A basic text generation model for a project I'm working on
 
 
+Documentation and Log:
+https://docs.google.com/document/d/1UA-dEF-IMr5-mOgkp6ORRtAERDEprKHw3K_Lw9A-vmU/edit?usp=sharing
+
+
 
 
 # Problems and Solutions
