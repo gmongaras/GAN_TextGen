@@ -1,4 +1,4 @@
-from torch.fft import fftn
+from torch.fft import fft
 from torch import nn
 
 
@@ -36,7 +36,7 @@ class CustomEmb(nn.Module):
     def forward(self, X):
         # Use a FFT transformation on the data if specified
         if self.useFFT:
-            X = fftn(X, dim=-1).real
+            X = fft(X, dim=-1).real
         
         # Send the data through the linear layers
         X = self.linear(X)
