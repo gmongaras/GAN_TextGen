@@ -45,7 +45,7 @@ class Generator(nn.Module):
         
         # If the embed_mode is "custom", use the custom embedding mode
         if embed_mode == "custom":
-            self.CustomEmb = CustomEmb(len(vocab.keys()), embedding_size, [len(vocab.keys())//2, len(vocab.keys())//4, len(vocab.keys()), 1000, 100], True, self.device)
+            self.CustomEmb = CustomEmb(len(vocab.keys()), embedding_size, [len(vocab.keys())//2, len(vocab.keys())//4, 1000, 100], True, self.device)
         # If the embed_mode is "norm", use Word2Vec embeddings
         else:
             self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
