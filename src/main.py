@@ -66,7 +66,7 @@ def main():
     Beta_T = 0.02 # Highest possible Beta value, when t is T
     T_min = 5 # Min diffusion steps when corrupting the data
     T_max = 1000 # Max diffusion steps when corrupting the data
-    sigma = 0.05 # Addative noise weighting term
+    sigma = 0.05 # Standard deviation of the noise to add to the data
     d_target = 0.6 # Term used for the T scheduler denoting if the T change should
                    # be positive of negative depending on the disc output
     C = 5 # Constant for the T scheduler multiplying the change of T
