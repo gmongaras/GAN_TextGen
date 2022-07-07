@@ -1,4 +1,5 @@
 import torch
+from nltk.tokenize import word_tokenize
 
 
 
@@ -26,19 +27,17 @@ def loadVocab(vocab_file):
 # Output:
 #   A list of cleaned words
 def get_clean_words(Sentence):
-    unwanted = ["!", "\"", "#", "$", "%", "&", 
-                "(", ")", "*", "+", ",", "-", ".",
-                "/", ":", ";", "<", "=", ">", "?", "@",
-                "[", "\\", "]", "^", "_", "`", "{", "|",
-                "}", "~", "\n", "\t"]
-    
-    # Replace any characters in the line we don't want
-    for i in unwanted:
-        Sentence = Sentence.replace(i, " ")
+    # Make the sentence lowercase
     Sentence = Sentence.lower()
     
-    # Breakup the string and return it
-    return Sentence.split(" ")
+    # Split the sentence up into words
+    words = word_tokenize(Sentence)
+    
+    # Remove all punctuation
+    words = [word for word in words if word.isalpha()]
+    
+    # Return the words
+    return words
 
 
 

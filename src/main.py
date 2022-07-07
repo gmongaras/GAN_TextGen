@@ -1,5 +1,5 @@
 import torch
-from models.Generator import Generator
+from Diff_GAN_Model import Diff_GAN_Model
 from GAN_Model import GAN_Model
 from helpers.helpers import loadVocab
 
@@ -48,7 +48,7 @@ def main():
     num_heads = 2
     
     # Training parameters
-    trainingMode = "diff" # How should the models be trained ("gan" or "diff")
+    trainingMode = "gan" # How should the models be trained ("gan" or "diff")
     pooling = "avg" # Pooling mode for the discriminator blocks ("avg", "max", or "none")
     embed_mode = "norm" # Embedding mode for the generator ("norm" or "custom")
     alpha = 0.0001
@@ -73,7 +73,7 @@ def main():
     
     # Create the model
     if trainingMode.lower() == "diff":
-        model = GAN_Model(vocab, M_gen, N_gen, N_disc, batchSize, 
+        model = Diff_GAN_Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                 embedding_size, sequence_length, num_heads,
                 trainingRatio, decRatRate, pooling, 
                 embed_mode, alpha, Lambda,
