@@ -1,19 +1,19 @@
-from helpers import encode_sentences
-from helpers import encode_sentences_one_hot
-from helpers import addPadding
-from helpers import addPadding_one_hot
+from helpers.helpers import encode_sentences
+from helpers.helpers import encode_sentences_one_hot
+from helpers.helpers import addPadding
+from helpers.helpers import addPadding_one_hot
 
 
-from losses import wasserstein_disc
-from losses import wasserstein_disc_split
-from losses import wasserstein_gen
-from losses import minimax_disc
-from losses import minimax_gen
-from losses import minimax_loss
+from models.losses import wasserstein_disc
+from models.losses import wasserstein_disc_split
+from models.losses import wasserstein_gen
+from models.losses import minimax_disc
+from models.losses import minimax_gen
+from models.losses import minimax_loss
 
 
-from Generator import Generator
-from Discriminator import Discriminator
+from models.Generator import Generator
+from models.Discriminator import Discriminator
 import torch
 from torch import nn
 import numpy as np
@@ -29,7 +29,7 @@ gpu = torch.device('cuda:0')
 
 
 
-class Model(nn.Module):
+class GAN_Model(nn.Module):
     # Inputs:
     #   vocab - A dictionary of vocab where the keys are integers and the
     #           values are words
@@ -58,7 +58,7 @@ class Model(nn.Module):
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
     def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
-        super(Model, self).__init__()
+        super(GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
         assert trainingRatio[0]<=trainingRatio[1], "The training ratio must have a grater number in the zeroth index"

@@ -1,7 +1,7 @@
 import torch
-from Generator import Generator
-from Model import Model
-from helpers import loadVocab
+from models.Generator import Generator
+from GAN_Model import GAN_Model
+from helpers.helpers import loadVocab
 
 
 
@@ -46,6 +46,9 @@ def main():
     embedding_size = 20
     sequence_length = 64
     num_heads = 2
+    
+    # Training parameters
+    trainingMode = "diff" # How should the models be trained ("gan" or "diff")
     pooling = "avg" # Pooling mode for the discriminator blocks ("avg", "max", or "none")
     embed_mode = "norm" # Embedding mode for the generator ("norm" or "custom")
     alpha = 0.0001
@@ -58,13 +61,32 @@ def main():
     decRatRate = -1 # Decrease the ratio after every decRatRate steps (-1 for not decrease)
     saveSteps = 10 # Number of steps until the model is saved
     
+    # Diffusion GAN parameters (if used)
+    Beta_0 = 0.0001 # Lowest possible Beta value, when t is 0
+    Beta_T = 0.02 # Highest possible Beta value, when t is T
+    T_min = 5 # Min diffusion steps when corrupting the data
+    T_max = 1000 # Max diffusion steps when corrupting the data
+    sigma = 0.05 # Addative noise weighting term
+    d_target = 0.6 # Term used for the T scheduler denoting if the T change should
+                   # be positive of negative depending on the disc output
+    C = 5 # Constant for the T scheduler multiplying the change of T
+    
     # Create the model
-    model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
-                  embedding_size, sequence_length, num_heads,
-                  trainingRatio, decRatRate, pooling, 
-                  embed_mode, alpha, Lambda,
-                  Beta1, Beta2, device, saveSteps, saveDir, 
-                  genSaveFile, discSaveFile, trainGraphFile)
+    if trainingMode.lower() == "diff":
+        model = GAN_Model(vocab, M_gen, N_gen, N_disc, batchSize, 
+                embedding_size, sequence_length, num_heads,
+                trainingRatio, decRatRate, pooling, 
+                embed_mode, alpha, Lambda,
+                Beta1, Beta2, device, saveSteps, saveDir, 
+                genSaveFile, discSaveFile, trainGraphFile,
+                Beta_0, Beta_T, T_min, T_max, sigma, d_target, C)
+    else:
+        model = GAN_Model(vocab, M_gen, N_gen, N_disc, batchSize, 
+                    embedding_size, sequence_length, num_heads,
+                    trainingRatio, decRatRate, pooling, 
+                    embed_mode, alpha, Lambda,
+                    Beta1, Beta2, device, saveSteps, saveDir, 
+                    genSaveFile, discSaveFile, trainGraphFile)
     
     
     ### Training The Model ###
