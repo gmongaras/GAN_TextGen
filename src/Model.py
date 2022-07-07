@@ -45,6 +45,8 @@ class Model(nn.Module):
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
     #                never decrease the ratio
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
+    #   embed_mode - What embedding mode should be used for the
+    #                generator? ("norm" or "custom")
     #   alpha - Learning rate of the model
     #   Lambda - Lambda value used for gradient penalty in disc loss
     #   Beta1 - Adam beta 1 term
@@ -55,7 +57,7 @@ class Model(nn.Module):
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
         super(Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -69,6 +71,7 @@ class Model(nn.Module):
         self.trainingRatio = trainingRatio
         self.decRatRate = decRatRate
         self.Lambda = Lambda
+        self.embed_mode = embed_mode
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -94,10 +97,10 @@ class Model(nn.Module):
         
         # The generator and discriminator models
         if self.dev != "cpu":
-            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, gpu)
+            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, gpu)
             self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, gpu)
         else:
-            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, device)
+            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device)
             self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, device)
         
         # The optimizer for the model
@@ -151,7 +154,8 @@ class Model(nn.Module):
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
         # Encode the sentences
-        X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec, self.device), dtype=object)
+        if self.embed_mode != "custom":
+            X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec, self.device), dtype=object)
         X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.device), dtype=object)
         
         # Save loss values over training for the loss plot
@@ -168,7 +172,7 @@ class Model(nn.Module):
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
-            disc_nums = torch.randperm(len(X_orig), device=self.device)
+            disc_nums = torch.randperm(len(X_orig_one_hot), device=self.device)
             
             # Train the discriminator first
             self.optim_disc.zero_grad()

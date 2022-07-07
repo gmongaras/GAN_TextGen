@@ -10,7 +10,7 @@ from helpers import loadVocab
 
 def main():
     # Paramters
-    input_file = "data/data.txt"
+    input_file = "data/data_small.txt"
     vocab_file = "vocab.csv"
     
     # Saving/Loading paramters
@@ -46,7 +46,8 @@ def main():
     embedding_size = 20
     sequence_length = 64
     num_heads = 2
-    pooling = "avg" # Pooling mode for th discriminator blocks ("avg", "max", or "none")
+    pooling = "avg" # Pooling mode for the discriminator blocks ("avg", "max", or "none")
+    embed_mode = "norm" # Embedding mode for the generator ("norm" or "custom")
     alpha = 0.0001
     Beta1 = 0 # Adam beta 1 term
     Beta2 = 0.9 # Adam beta 2 term
@@ -60,7 +61,8 @@ def main():
     # Create the model
     model = Model(vocab, M_gen, N_gen, N_disc, batchSize, 
                   embedding_size, sequence_length, num_heads,
-                  trainingRatio, decRatRate, pooling, alpha, Lambda,
+                  trainingRatio, decRatRate, pooling, 
+                  embed_mode, alpha, Lambda,
                   Beta1, Beta2, device, saveSteps, saveDir, 
                   genSaveFile, discSaveFile, trainGraphFile)
     
