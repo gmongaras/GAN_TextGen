@@ -10,7 +10,7 @@ from helpers.helpers import loadVocab
 
 def main():
     # Paramters
-    input_file = "data/Fortunes/data.txt"
+    input_file = "data/Fortunes/data_small.txt"
     vocab_file = "vocab_fortunes.csv"
     
     # Saving/Loading paramters

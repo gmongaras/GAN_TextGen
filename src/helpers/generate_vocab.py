@@ -14,7 +14,7 @@ def generate():
     # The created vocab as each word is seen
     vocab = {"<START>": 0, "<PAD>": 1, "<END>": 2, "<UNKNOWN>": 3}
     
-    i = 0
+    i = len(vocab)
     
     # Iterate over all lines in the file
     file = open(vocabFile, "r")
