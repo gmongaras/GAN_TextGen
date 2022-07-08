@@ -213,8 +213,8 @@ class Diff_GAN_Model(nn.Module):
                 disc_real = self.discriminator(y)
                 disc_fake = self.discriminator(y_g)
                 
-                # Get the negative discriminator loss
-                # to maximize the loss
+                # Get the discriminator loss
+                # which we want to maximize
                 discLoss = -diff_disc(disc_real, disc_fake)
                 
                 discLoss_real, discLoss_fake = diff_disc_split(disc_real, disc_fake)
@@ -283,7 +283,7 @@ class Diff_GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    T: {self.T}\n")
     
     
     

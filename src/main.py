@@ -15,8 +15,8 @@ def main():
     
     # Saving/Loading paramters
     saveDir = "models"
-    genSaveFile = "gen_model.pkl"
-    discSaveFile = "disc_model.pkl"
+    genSaveFile = "gen_model1.pkl"
+    discSaveFile = "disc_model1.pkl"
     trainGraphFile = "trainGraph.png"
     
     loadDir = "models"
