@@ -45,14 +45,14 @@ def y_sample(data, sigma, variance_scheduler, t):
     # The a_bar value weights the data higher when
     # t is small and the noise higher when t is large,
     # thus corrupting the data more when t is higher.
-    a_bars = get_a_bars(variance_scheduler, t)
+    a_bars = get_a_bars(variance_scheduler, t).to(data.device)
     a_bars = a_bars.unsqueeze(-1).unsqueeze(-1).repeat(1, data.shape[1], data.shape[2])
     
     # Term 1: Scaled data
     scaled_data_gen = torch.sqrt(a_bars)*data
     
     # Term 2: Additive noise
-    epsilon = torch.randn_like(data)
+    epsilon = torch.randn_like(data, device=data.device)
     additive_noise = torch.sqrt(1-a_bars)*sigma*epsilon
     
     # Return the final values
