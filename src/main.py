@@ -27,8 +27,13 @@ def main():
     
     ### Load in the data ###
     sentences = []
+    max = 100000   # Max number of sentences to load in
+    i = 0
     with open(input_file, "r") as file:
         for line in file:
+            if i == max:
+                break
+            i += 1
             sentences.append(line.strip())
     
     

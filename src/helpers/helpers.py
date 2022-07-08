@@ -67,6 +67,9 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, device):
     
     # Iterate over all sentences
     for sentence in X:
+        # Has the sentence been encoded?
+        enc = True
+        
         # List of encoded words starting with <START>
         enc_words = [start_end]
         
@@ -80,10 +83,19 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, device):
                 continue
 
             # Encode the word
-            word_enc = encoder(torch.tensor(vocab_inv[word], device=device))
+            try:
+                word_enc = encoder(torch.tensor(vocab_inv[word], device=device))
+            except:
+                enc = False
+                break
             
             # Save the encoded word
             enc_words.append(word_enc)
+        
+        # If the word has not been encoded, an error happened, so
+        # skip the sentence
+        if enc == False:
+            continue
         
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
@@ -121,6 +133,9 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, device):
     
     # Iterate over all sentences
     for sentence in X:
+        # Has the sentence been encoded?
+        enc = True
+        
         # List of encoded words starting with <START>
         enc_words = [start_end]
         
@@ -134,10 +149,18 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, device):
                 continue
 
             # Encode the word
-            word_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv[word]), len(vocab_inv))
+            try:
+                word_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv[word]), len(vocab_inv))
+            except:
+                enc = False
             
             # Save the encoded word
             enc_words.append(word_enc)
+            
+        # If the word has not been encoded, an error happened, so
+        # skip the sentence
+        if enc == False:
+            continue
         
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
