@@ -53,7 +53,7 @@ def main():
     num_heads = 2
     
     # Training parameters
-    trainingMode = "gan" # How should the models be trained ("gan" or "diff")
+    trainingMode = "diff" # How should the models be trained ("gan" or "diff")
     pooling = "avg" # Pooling mode for the discriminator blocks ("avg", "max", or "none")
     embed_mode = "norm" # Embedding mode for the generator ("norm" or "custom")
     alpha = 0.0001

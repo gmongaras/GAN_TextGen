@@ -98,10 +98,10 @@ class GAN_Model(nn.Module):
         # The generator and discriminator models
         if self.dev != "cpu":
             self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, gpu)
-            self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, gpu)
+            self.discriminator = Discriminator(N_disc, "none", batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, gpu)
         else:
             self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device)
-            self.discriminator = Discriminator(N_disc, batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, device)
+            self.discriminator = Discriminator(N_disc, "none", batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, device)
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
@@ -154,8 +154,6 @@ class GAN_Model(nn.Module):
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
         # Encode the sentences
-        if self.embed_mode != "custom":
-            X_orig = np.array(encode_sentences(X, self.vocab_inv, self.sequence_length, self.generator.Word2Vec, self.device), dtype=object)
         X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.device), dtype=object)
         
         # Save loss values over training for the loss plot
@@ -177,8 +175,7 @@ class GAN_Model(nn.Module):
             # Train the discriminator first
             self.optim_disc.zero_grad()
             for i in range(0, max(self.trainingRatio[1], 1)):
-                # Sample the data to get data the generator and
-                # discriminator will see
+                # Sample data for the discriminator
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
 

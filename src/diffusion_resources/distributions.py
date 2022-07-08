@@ -14,14 +14,14 @@ def get_a_bars(variance_scheduler, t):
     # The a_bar values
     a_bar = torch.ones(t.shape)
     
-    # Iterate from s=1 to s=t
-    for s in range(1, t+1):
-        # Get the beta values
-        betas = variance_scheduler.get_betas(t)
+    # Iterate over all t values to get their
+    # a_bar value
+    for i in range(0, len(t)):
+        # Create the array of values to multiply together
+        prods = [1-variance_scheduler(s) for s in range(1, int(t[i].item()))]
         
-        # Multiply the current a_bar values by
-        # 1-betas
-        a_bar *= 1-betas
+        # Get the a_bar value and save it
+        a_bar[i] = np.prod(prods)
         
     # Return the a bar values
     return a_bar
@@ -41,8 +41,12 @@ def get_a_bars(variance_scheduler, t):
 #   t - Batch of t values corresponding to the batch of
 #       data to retreive the variance at
 def y_sample(data, sigma, variance_scheduler, t):
-    # Get the a_bar values at the current timestep
+    # Get the a_bar values at the current timestep.
+    # The a_bar value weights the data higher when
+    # t is small and the noise higher when t is large,
+    # thus corrupting the data more when t is higher.
     a_bars = get_a_bars(variance_scheduler, t)
+    a_bars = a_bars.unsqueeze(-1).unsqueeze(-1).repeat(1, data.shape[1], data.shape[2])
     
     # Term 1: Scaled data
     scaled_data_gen = torch.sqrt(a_bars)*data
@@ -64,7 +68,6 @@ def y_sample(data, sigma, variance_scheduler, t):
 #   sample_size - The number of values to sample from the distribution
 #   T - Current T value
 def p_pie_sample(sample_size, T):
-    sum = torch.sum([i for i in range(1, T+1)])
-    weights = torch.tensor([(i/sum) for i in range(1, T+1)])
-    sample = np.random.choice([i for i in range(0, T)], sample_size, p=weights)
-    return torch.tensor(sample)
+    weights = np.arange(T)/np.arange(T).sum()
+    sample = np.random.choice(np.arange(1, T+1), size=sample_size, p=weights)
+    return sample

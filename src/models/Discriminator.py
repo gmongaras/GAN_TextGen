@@ -10,6 +10,8 @@ import os
 class Discriminator(nn.Module):
     # Inputs:
     #   N - The number of discriminator blocks to use
+    #   outMode - How should the output be transformed?
+    #             ("none", "sigmoid", or "tanh")
     #   batchSize - Batch size of the input sequence
     #   vocab_size - The size of the vocab used by the generator.
     #                Note: This value is the embedding size
@@ -20,10 +22,11 @@ class Discriminator(nn.Module):
     #   num_heads - Number of heads to use in the MHA block
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   device - Device to put the model on
-    def __init__(self, N, batchSize, vocab_size, embedding_size, sequence_length, num_heads, pooling, device):
+    def __init__(self, N, outMode, batchSize, vocab_size, embedding_size, sequence_length, num_heads, pooling, device):
         super(Discriminator, self).__init__()
 
         self.device = device
+        self.outMode = outMode.lower()
         
         # Input linear layers to turn the input embedding size
         # (the vocab size) into the desired embedding size
@@ -83,8 +86,10 @@ class Discriminator(nn.Module):
         
         # Send the token through a feed-forward network layer
         X = self.out_FF(X)
-        #X = self.Sigmoid(X)
-        #X = self.Tanh(X)
+        if self.outMode == "sigmoid":
+            X = self.Sigmoid(X)
+        elif self.outMode == "tanh":
+            X = self.Tanh(X)
         
         return X
     

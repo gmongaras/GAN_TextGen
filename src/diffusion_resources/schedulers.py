@@ -9,18 +9,18 @@ class linear_variance_scheduler():
     # Inputs:
     #   B_0 - Lowest possible beta value
     #   B_T - Highest possible beta value
-    #   T - Highest possible number of Beta timesteps
-    def __init__(self, B_0, B_T, T):
+    #   T_max - Highest possible number of Beta timesteps
+    def __init__(self, B_0, B_T, T_max):
         self.B_0 = B_0
         self.B_T = B_T
-        self.T = T
+        self.T_max = T_max
     
     
-    # Get the bariance/beta value at the given timesetps
+    # Get the variance/beta value at the given timesetps
     # Inputs:
     #   t - The current timesteps to get the Beta value at
-    def get_betas(self, t):
-        return ((self.B_T-self.B_0)/self.T)*t + self.B_0
+    def __call__(self, t):
+        return ((self.B_T-self.B_0)/self.T_max)*t + self.B_0
 
 
 # Given the current T value and the discriminator

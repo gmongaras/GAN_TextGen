@@ -33,6 +33,22 @@ def wasserstein_gen(y_pred_gen):
 
 
 
+# Loss functions for the diffusion model
+def diff_disc(disc_real, disc_fake):
+    return torch.mean(torch.log(disc_real)) + \
+        torch.mean(torch.log(1-disc_fake))
+        
+def diff_disc_split(disc_real, disc_fake):
+    return torch.mean(torch.log(disc_real)), \
+        torch.mean(torch.log(1-disc_fake))
+
+def diff_gen(disc_fake):
+    return torch.mean(torch.log(1-disc_fake))
+
+
+
+
+
 
 
 # Normal BCE loss for the discriminator
