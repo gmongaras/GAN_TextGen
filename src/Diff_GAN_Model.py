@@ -150,6 +150,9 @@ class Diff_GAN_Model(nn.Module):
         # Update the T equation using the T scheduler
         self.T = T_scheduler(self.T, self.d_target, self.C, D_real)
         
+        # Clip T between T_min and T_max
+        self.T = torch.clamp(self.T, self.T_min, self.T_max)
+        
         # Update the t_epl array
         self.t_epl[32:] = p_pie_sample(32, self.T.cpu().detach())
     
