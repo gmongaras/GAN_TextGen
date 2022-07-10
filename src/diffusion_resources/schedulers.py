@@ -24,7 +24,13 @@ class linear_variance_scheduler():
 
 
 # Given the current T value and the discriminator
-# performance on real data
+# performance on real data, get the updated value of T
+# Inputs:
+#   T - The current value of T
+#   d_target - The value we want the average discriminator out
+#              on real data to be
+#   C - A constant multiplying the effect of the change in T
+#   D_real - The discriminator output on real data
 def T_scheduler(T, d_target, C, D_real):
     r_d = torch.mean(torch.sign(D_real - 0.5))
     return T + torch.sign(r_d - d_target)*C

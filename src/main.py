@@ -74,7 +74,7 @@ def main():
     sigma = 0.05 # Standard deviation of the noise to add to the data
     d_target = 0.6 # Term used for the T scheduler denoting if the T change should
                    # be positive of negative depending on the disc output
-    C = 5 # Constant for the T scheduler multiplying the change of T
+    C = 1 # Constant for the T scheduler multiplying the change of T
     
     # Create the model
     if trainingMode.lower() == "diff":
