@@ -154,7 +154,7 @@ class GAN_Model(nn.Module):
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
         # Encode the sentences
-        X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.device), dtype=object)
+        X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, True, self.device), dtype=object)
         
         # Save loss values over training for the loss plot
         self.genLoss = []
