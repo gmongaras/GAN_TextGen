@@ -202,6 +202,27 @@ class Diff_GAN_Model(nn.Module):
                 # Get a batch of data from the generator
                 with torch.no_grad():
                     x_g = self.generator.forward_train()
+                    
+                # Get a real data subset using one_hot encoding
+                if self.loadInEpoch == True:
+                    # Load in more data until no more data is availble
+                    # or the requested batch size is obtained
+                    x = np.array([])
+                    while x.shape[0] < self.batchSize or disc_nums.shape[0] == 0:
+                        # Get more data if needed
+                        disc_sub = disc_nums[:self.batchSize]
+                        disc_nums = disc_nums[self.batchSize:]
+                        
+                        # Save the data
+                        if len(x) == 0:
+                            x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                        else:
+                            x = np.concatenate((x, np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)[self.batchSize-x.shape[0]:]))
+                    
+                    # If disc_nums is empty, a problem occured
+                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence langth"
+                else:
+                    x = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
                 
                 # Get a batch of real data and add padding
                 # to it
