@@ -98,24 +98,17 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
             enc_words.append(word_enc)
         
         # If the word has not been encoded, an error happened, so
-        # skip the sentence
+        # skip the sentence and delete it
         if enc == False:
-            if deleteOrig == True:
-                del X[i]
-            else:
-                i += 1
+            del X[i]
             continue
         
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
         
-        # Skip the sentence is it's too long
+        # Skip the sentence and delete it if it's too long
         if len(enc_words) > sequence_length:
-            if deleteOrig == True:
-                del X[i]
-            else:
-                i += 1
-            
+            del X[i]
             continue
         
         # Turn the encoded words into a list and save it
@@ -177,30 +170,23 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
                 word_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv[word]), len(vocab_inv))
             except:
                 enc = False
+                break
             
             # Save the encoded word
             enc_words.append(word_enc)
             
         # If the word has not been encoded, an error happened, so
-        # skip the sentence
+        # skip the sentence and delete it
         if enc == False:
-            if deleteOrig == True:
-                del X[i]
-            else:
-                i += 1
-            
+            del X[i]
             continue
         
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
         
-        # Skip the sentence is it's too long
+        # Skip the sentence and delete it if it's too long
         if len(enc_words) > sequence_length:
-            if deleteOrig == True:
-                del X[i]
-            else:
-                i += 1
-            
+            del X[i]
             continue
         
         # Turn the encoded words into a list and save it

@@ -208,7 +208,25 @@ class GAN_Model(nn.Module):
                 
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:
-                    real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()], self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                    # Load in more data until no more data is availble
+                    # or the requested batch size is obtained
+                    real_X = np.array([])
+                    while real_X.shape[0] < self.batchSize or disc_nums.shape[0] == 0:
+                        # Get more data if needed
+                        disc_sub = disc_nums[:self.batchSize]
+                        disc_nums = disc_nums[self.batchSize:]
+                        
+                        # Save the data
+                        if len(real_X) == 0:
+                            real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()], self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                        else:
+                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()], self.vocab_inv, self.sequence_length, False, self.device), dtype=object)))
+                    
+                    # If disc_nums is empty, a problem occured
+                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence langth"
+                    
+                    # Get the subset of the data
+                    real_X = real_X[:self.batchSize]
                 else:
                     real_X = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
                 
@@ -244,11 +262,6 @@ class GAN_Model(nn.Module):
                 # Step the optimizer
                 self.optim_disc.step()
                 self.optim_disc.zero_grad()
-                
-                # clip parameters of the discriminator
-                #if self.clip_val > 0:
-                #    for p in self.discriminator.parameters():
-                #        p.data.clamp_(-self.clip_val, self.clip_val)
 
                 # Delete all discriminator stuff as its no longer needed
                 del disc_sub, disc_fake, real_X, gradient_penalty, disc_real, discLoss

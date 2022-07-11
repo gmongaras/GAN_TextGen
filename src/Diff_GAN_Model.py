@@ -198,7 +198,6 @@ class Diff_GAN_Model(nn.Module):
             for i in range(0, max(self.trainingRatio[1], 1)):
                 # Sample a batch of real data
                 disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
                 
                 # Get a batch of data from the generator
                 with torch.no_grad():
@@ -255,7 +254,6 @@ class Diff_GAN_Model(nn.Module):
                 # Get subset indices of the data for the generator
                 # and discriminator
                 disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
                 
                 # Get a batch of data from the generator
                 x_g = self.generator.forward_train()
