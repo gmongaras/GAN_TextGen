@@ -57,7 +57,11 @@ class GAN_Model(nn.Module):
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile):
+    #   loadInEpoch - Should the data be loaded in as needed instead of
+    #                 before training (True if so, False to load before training)
+    #   delWhenLoaded - Delete the data as it's loaded in to save space?
+    #                   Note: This is automatically False if loadInEpoch is True
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -72,6 +76,8 @@ class GAN_Model(nn.Module):
         self.decRatRate = decRatRate
         self.Lambda = Lambda
         self.embed_mode = embed_mode
+        self.loadInEpoch = loadInEpoch
+        self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -153,8 +159,13 @@ class GAN_Model(nn.Module):
     #   X - A list of sentences to train the models on
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
-        # Encode the sentences
-        X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, True, self.device), dtype=object)
+        # Encode the all the data if self.loadInEpoch is false
+        if self.loadInEpoch == False:
+            X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device), dtype=object)
+            s = X_orig_one_hot.shape[0]
+        else:
+            X = np.array(X, dtype=object)
+            s = X.shape[0]
         
         # Save loss values over training for the loss plot
         self.genLoss = []
@@ -170,7 +181,7 @@ class GAN_Model(nn.Module):
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
-            disc_nums = torch.randperm(len(X_orig_one_hot), device=self.device)
+            disc_nums = torch.randperm(s, device=self.device)
             
             # Train the discriminator first
             self.optim_disc.zero_grad()
@@ -196,7 +207,10 @@ class GAN_Model(nn.Module):
                 disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
                 
                 # Get a real data subset using one_hot encoding
-                real_X = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
+                if self.loadInEpoch == True:
+                    real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()], self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                else:
+                    real_X = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
                 
                 # Add padding to the subset
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)

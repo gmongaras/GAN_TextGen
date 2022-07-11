@@ -53,7 +53,7 @@ def main():
     num_heads = 2
     
     # Training parameters
-    trainingMode = "diff" # How should the models be trained ("gan" or "diff")
+    trainingMode = "gan" # How should the models be trained ("gan" or "diff")
     pooling = "avg" # Pooling mode for the discriminator blocks ("avg", "max", or "none")
     embed_mode = "norm" # Embedding mode for the generator ("norm" or "custom")
     alpha = 0.0001
@@ -61,10 +61,14 @@ def main():
     Beta2 = 0.9 # Adam beta 2 term
     Lambda = 10 # Lambda value used for gradient penalty in disc loss
     device = "cpu"  # cpu, partgpu, or fullgpu
-    epochs = 50000
+    epochs = 300000
     trainingRatio = [1, 5] #Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = -1 # Decrease the ratio after every decRatRate steps (-1 for not decrease)
     saveSteps = 10 # Number of steps until the model is saved
+    loadInEpoch = True # Should the data be loaded in as needed instead of
+                       # before training (True if so, False to load before training)
+    delWhenLoaded = True # Delete the data as it's loaded in to save space?
+                         # Note: This is automatically False if loadInEpoch is True
     
     # Diffusion GAN parameters (if used)
     Beta_0 = 0.0001 # Lowest possible Beta value, when t is 0
@@ -84,6 +88,7 @@ def main():
                 embed_mode, alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
                 genSaveFile, discSaveFile, trainGraphFile,
+                loadInEpoch, delWhenLoaded,
                 Beta_0, Beta_T, T_min, T_max, sigma, d_target, C)
     else:
         model = GAN_Model(vocab, M_gen, N_gen, N_disc, batchSize, 
@@ -91,7 +96,8 @@ def main():
                     trainingRatio, decRatRate, pooling, 
                     embed_mode, alpha, Lambda,
                     Beta1, Beta2, device, saveSteps, saveDir, 
-                    genSaveFile, discSaveFile, trainGraphFile)
+                    genSaveFile, discSaveFile, trainGraphFile,
+                    loadInEpoch, delWhenLoaded)
     
     
     ### Training The Model ###

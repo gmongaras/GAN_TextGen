@@ -64,6 +64,10 @@ class Diff_GAN_Model(nn.Module):
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
+    #   loadInEpoch - Should the data be loaded in as needed instead of
+    #                 before training (True if so, False to load before training)
+    #   delWhenLoaded - Delete the data as it's loaded in to save space?
+    #                   Note: This is automatically False if loadInEpoch is True
     #   Beta_0 - Lowest possible Beta value, when t is 0
     #   Beta_T - Highest possible Beta value, when t is T
     #   T_min - Min diffusion steps when corrupting the data
@@ -73,7 +77,7 @@ class Diff_GAN_Model(nn.Module):
     #               T change should be positive of negative depending 
     #               on the disc output
     #   C - Constant for the T scheduler multiplying the change of T
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
         super(Diff_GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -88,6 +92,8 @@ class Diff_GAN_Model(nn.Module):
         self.decRatRate = decRatRate
         self.Lambda = Lambda
         self.embed_mode = embed_mode
+        self.loadInEpoch = loadInEpoch
+        self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -164,7 +170,12 @@ class Diff_GAN_Model(nn.Module):
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
         # Encode the sentences
-        X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, True, self.device), dtype=object)
+        if self.loadInEpoch == False:
+            X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device), dtype=object)
+            s = X_orig_one_hot.shape[0]
+        else:
+            X = np.array(X, dtype=object)
+            s = X.shape[0]
         
         # Save loss values over training for the loss plot
         self.genLoss = []
@@ -180,7 +191,7 @@ class Diff_GAN_Model(nn.Module):
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
-            disc_nums = torch.randperm(len(X_orig_one_hot), device=self.device)
+            disc_nums = torch.randperm(s, device=self.device)
             
             # Step 1: Train the discriminator
             self.optim_disc.zero_grad()
@@ -195,7 +206,10 @@ class Diff_GAN_Model(nn.Module):
                 
                 # Get a batch of real data and add padding
                 # to it
-                x = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
+                if self.loadInEpoch == True:
+                    x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()], self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                else:
+                    x = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
                 x = addPadding_one_hot(x, self.vocab_inv, self.sequence_length)
                 if self.dev == "partgpu":
                     x = x.to(gpu)
