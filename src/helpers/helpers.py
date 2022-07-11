@@ -100,6 +100,10 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         # If the word has not been encoded, an error happened, so
         # skip the sentence
         if enc == False:
+            if deleteOrig == True:
+                del X[i]
+            else:
+                i += 1
             continue
         
         # Add an <END> token to the sequence
@@ -107,6 +111,11 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         
         # Skip the sentence is it's too long
         if len(enc_words) > sequence_length:
+            if deleteOrig == True:
+                del X[i]
+            else:
+                i += 1
+            
             continue
         
         # Turn the encoded words into a list and save it
@@ -175,6 +184,11 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
         # If the word has not been encoded, an error happened, so
         # skip the sentence
         if enc == False:
+            if deleteOrig == True:
+                del X[i]
+            else:
+                i += 1
+            
             continue
         
         # Add an <END> token to the sequence
@@ -182,6 +196,11 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
         
         # Skip the sentence is it's too long
         if len(enc_words) > sequence_length:
+            if deleteOrig == True:
+                del X[i]
+            else:
+                i += 1
+            
             continue
         
         # Turn the encoded words into a list and save it
