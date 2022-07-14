@@ -17,6 +17,6 @@ https://docs.google.com/document/d/1UA-dEF-IMr5-mOgkp6ORRtAERDEprKHw3K_Lw9A-vmU/
 
 
 Note: Data from the following README:
-
-- https://github.com/ruanyf/fortunes
-- http://www.fortunecookiemessage.com/
+- Random Text: https://www.kaggle.com/datasets/kashnitsky/hierarchical-text-classification
+- Fortunes 1: https://github.com/ruanyf/fortunes
+- Fortunes 2: http://www.fortunecookiemessage.com/
