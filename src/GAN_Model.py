@@ -19,6 +19,7 @@ from torch import nn
 import numpy as np
 
 import matplotlib.pyplot as plt
+import os
 
 
 
@@ -343,7 +344,7 @@ class GAN_Model(nn.Module):
                 ax.set_xlabel("Epochs")
                 ax.set_ylabel("Loss")
                 ax.legend()
-                plt.savefig(self.trainGraphFile)
+                plt.savefig(self.saveDir + os.sep + self.trainGraphFile)
                 plt.close()
     
     # Load the models

@@ -18,6 +18,7 @@ def main():
     genSaveFile = "gen_model.pkl"
     discSaveFile = "disc_model.pkl"
     trainGraphFile = "trainGraph.png"
+    TgraphFile = "TGraph.png" # Only used for diffusion GAN
     
     loadDir = "models"
     genLoadFile = "gen_model - 50.pkl"
@@ -88,7 +89,7 @@ def main():
                 embed_mode, alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
                 genSaveFile, discSaveFile, trainGraphFile,
-                loadInEpoch, delWhenLoaded,
+                TgraphFile, loadInEpoch, delWhenLoaded,
                 Beta_0, Beta_T, T_min, T_max, sigma, d_target, C)
     else:
         model = GAN_Model(vocab, M_gen, N_gen, N_disc, batchSize, 

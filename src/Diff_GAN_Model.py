@@ -22,6 +22,7 @@ import torch
 from torch import nn
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 from diffusion_resources.distributions import y_sample
 from diffusion_resources.distributions import p_pie_sample
@@ -64,6 +65,7 @@ class Diff_GAN_Model(nn.Module):
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
+    #   TgraphFile - File to save the T graph to
     #   loadInEpoch - Should the data be loaded in as needed instead of
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
@@ -77,7 +79,7 @@ class Diff_GAN_Model(nn.Module):
     #               T change should be positive of negative depending 
     #               on the disc output
     #   C - Constant for the T scheduler multiplying the change of T
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
+    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
         super(Diff_GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -101,6 +103,7 @@ class Diff_GAN_Model(nn.Module):
         self.genSaveFile = genSaveFile
         self.discSaveFile = discSaveFile
         self.trainGraphFile = trainGraphFile
+        self.TgraphFile = TgraphFile
         
         # Diffusion parameters
         self.Beta_0 = Beta_0
@@ -182,6 +185,9 @@ class Diff_GAN_Model(nn.Module):
         self.discLoss = []
         self.discLoss_real = []
         self.discLoss_fake = []
+        
+        # Save the T value over training
+        self.TVals = []
         
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
@@ -306,6 +312,9 @@ class Diff_GAN_Model(nn.Module):
             if epoch % 4 == 0:
                 self.update_diffusion(disc_real.cpu().detach())
             
+            # Save the T value
+            self.TVals.append(self.T)
+            
             
             # Decrease the rate
             if self.decRatRate > 0:
@@ -338,6 +347,7 @@ class Diff_GAN_Model(nn.Module):
             self.discriminator.saveModel(saveDir, discFile)
             
             if self.trainGraphFile:
+                # Training graph
                 fix, ax = plt.subplots()
                 y = [i for i in range(1, len(self.genLoss)+1)]
                 ax.plot(y, self.genLoss, label="Gen loss")
@@ -348,7 +358,18 @@ class Diff_GAN_Model(nn.Module):
                 ax.set_xlabel("Epochs")
                 ax.set_ylabel("Loss")
                 ax.legend()
-                plt.savefig(self.trainGraphFile)
+                plt.savefig(self.saveDir + os.sep + self.trainGraphFile)
+                plt.close()
+                
+                # T graph
+                fix, ax = plt.subplots()
+                y = [i for i in range(1, len(self.genLoss)+1)]
+                ax.plot(y, self.TVals, label="T Values")
+                ax.set_title("T values over epochs")
+                ax.set_xlabel("Epochs")
+                ax.set_ylabel("T value")
+                ax.legend()
+                plt.savefig(self.saveDir + os.sep + self.TgraphFile)
                 plt.close()
     
     # Load the models
