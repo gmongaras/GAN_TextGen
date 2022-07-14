@@ -34,11 +34,17 @@ class GAN_Model(nn.Module):
     # Inputs:
     #   vocab - A dictionary of vocab where the keys are integers and the
     #           values are words
-    #   M_gen - The number of blocks in the encoder part of the generator model
-    #   N_gen - The number of blocks in the decoder part of the generator model
-    #   N_disc - The number of blocks in the discriminator model
+    #   M_gen - Number of noise encoding blocks in the generator
+    #   B_gen - Number of generator blocks in the generator
+    #   O_gen - Number of MHA blocks in the generator
+    #   gausNoise - True to add pure gaussian noise in the generator output
+    #               encoding, False to not add this noise
+    #   T_disc - Number of transformer blocks in each discriminator block
+    #   B_disc - Number of discriminator blocks in the discriminator
+    #   O_disc - Number of output MHA blocks in the discrimiantor
     #   batchSize - Size to bach data into
-    #   embedding_size - The size of the vector to embed each word
+    #   embedding_size_gen - Embedding size of the generator
+    #   embedding_size_disc - Embedding size of the discriminator
     #   sequence_length - The max length of the sentence to train the model on
     #   num_heads - Number of heads for the MHA modules
     #   trainingRatio - 2-D array representing the number of epochs to 
@@ -46,8 +52,10 @@ class GAN_Model(nn.Module):
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
     #                never decrease the ratio
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
-    #   embed_mode - What embedding mode should be used for the
-    #                generator? ("norm" or "custom")
+    #   embed_mode_gen - What embedding mode should be used for the
+    #                    generator? ("norm" or "custom")
+    #   embed_mode_disc - What embedding mode should be used for the
+    #                     discriminator? ("fc" or "pca")
     #   alpha - Learning rate of the model
     #   Lambda - Lambda value used for gradient penalty in disc loss
     #   Beta1 - Adam beta 1 term
@@ -62,7 +70,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, N_gen, N_disc, batchSize, embedding_size, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -76,7 +84,6 @@ class GAN_Model(nn.Module):
         self.trainingRatio = trainingRatio
         self.decRatRate = decRatRate
         self.Lambda = Lambda
-        self.embed_mode = embed_mode
         self.loadInEpoch = loadInEpoch
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
@@ -104,11 +111,11 @@ class GAN_Model(nn.Module):
         
         # The generator and discriminator models
         if self.dev != "cpu":
-            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, gpu)
-            self.discriminator = Discriminator(N_disc, "none", batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, gpu)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gpu)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
         else:
-            self.generator = Generator(vocab, M_gen, N_gen, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device)
-            self.discriminator = Discriminator(N_disc, "none", batchSize, len(vocab), embedding_size, sequence_length, num_heads, pooling, device)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, device)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
@@ -126,6 +133,12 @@ class GAN_Model(nn.Module):
     #   x - A sample of real data
     #   x_tilde - A sample of data from the generator
     def get_gradient_penalty(self, x, x_tilde):
+        # So that NaN values aren't produced, make any numbers
+        # x_tilde that are exactly 1 or 0 slightly smaller or
+        # slightly larger
+        x_tilde = torch.where(x_tilde == 1.0, x_tilde-0.0001, x_tilde)
+        x_tilde = torch.where(x_tilde == 0.0, x_tilde+0.0001, x_tilde)
+        
         # Get the device
         device = self.device
         if self.dev == "partgpu":

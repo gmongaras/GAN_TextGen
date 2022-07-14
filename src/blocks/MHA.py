@@ -31,7 +31,7 @@ class MHA(nn.Module):
         self.MultiHeadAtt = nn.MultiheadAttention(output_embedding, num_heads, batch_first=True)
     
     
-    # 2 tensor input. The first input tensor X_1 will encode the
+    # 2 input tensors. The first input tensor X_1 will encode the
     # value and the query. The second tensor X-2 will encode
     # the query.
     # Input:

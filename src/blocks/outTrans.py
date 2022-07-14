@@ -13,13 +13,16 @@ class outTrans(nn.Module):
     #         values in the second MHA block
     #   E_2 - Input embedding from the input into
     #         the beginning of the transformer
+    #   gausNoise - True to add pure gaussian noise in the B output blocks,
+    #               False to not add gaussian noise
     #   num_heads - Number of heads in each MHA block
     #   FF_embedding - embedding size of the output of the
     #                  Feed-forward block
     #   device - Device to put tensors on
-    def __init__(self, E_1, E_2, num_heads, FF_embedding, device):
+    def __init__(self, E_1, E_2, gausNoise, num_heads, FF_embedding, device):
         super(outTrans, self).__init__()
         self.device = device
+        self.gausNoise = gausNoise
         
         # The first MHA module with a mask
         self.MHA1 = MHA(E_2, E_2, E_2, num_heads, True).to(device)
@@ -48,8 +51,9 @@ class outTrans(nn.Module):
         X += X_2
         X = self.LN1(X)
         
-        noise = torch.rand((X.shape), requires_grad=True, device=self.device)
-        X += noise
+        # Add gaussian noise if set to true
+        if self.gausNoise:
+            X += torch.rand((X.shape), requires_grad=True, device=self.device)
         
         X_saved = X.clone()
         X = self.MHA2(X_1, X)
