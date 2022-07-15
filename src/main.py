@@ -30,7 +30,7 @@ def main():
     sentences = []
     max = 100000   # Max number of sentences to load in
     i = 0
-    with open(input_file, "r") as file:
+    with open(input_file, "r", encoding='windows-1252') as file:
         for line in file:
             if i == max:
                 break
@@ -61,7 +61,7 @@ def main():
     num_heads = 2            # Number of heads in each MHA block
     
     # Training parameters
-    trainingMode = "gan"        # How should the models be trained ("gan" or "diff")
+    trainingMode = "diff"        # How should the models be trained ("gan" or "diff")
     pooling = "avg"             # Pooling mode for the discriminator blocks ("avg", "max", or "none")
     embed_mode_gen = "norm"     # Embedding mode for the generator ("norm" or "custom")
     embed_mode_disc = "fc"      # Embedding mode for the discriminator ("fc" or "pca")
@@ -71,7 +71,7 @@ def main():
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
     device = "cpu"              # cpu, partgpu, or fullgpu
     epochs = 300000             # Number of epoch to train the model
-    trainingRatio = [1, 5]      # Number of epochs to train the generator (0) vs the discriminator (1)
+    trainingRatio = [1, 1]      # Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = -1             # Decrease the ratio after every decRatRate steps (-1 for not decrease)
     saveSteps = 10              # Number of steps until the model is saved
     loadInEpoch = False         # Should the data be loaded in as needed instead of

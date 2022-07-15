@@ -234,7 +234,7 @@ class GAN_Model(nn.Module):
                         if len(real_X) == 0:
                             real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
                         else:
-                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)[self.batchSize-real_X.shape[0]:]))
+                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)[:self.batchSize-real_X.shape[0]]))
                     
                     # If disc_nums is empty, a problem occured
                     assert disc_nums.shape[0] > 0, "Not enough data under requested sequence langth"

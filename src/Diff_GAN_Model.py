@@ -139,10 +139,10 @@ class Diff_GAN_Model(nn.Module):
         # The generator and discriminator models
         if self.dev != "cpu":
             self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gpu)
-            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "sigmoid", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
         else:
             self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, device)
-            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "sigmoid", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
