@@ -16,6 +16,7 @@ def loadVocab(vocab_file):
         
         # Add to the vocab
         vocab[int(line[0])] = line[1]
+    vocabFile.close()
         
     return vocab
 

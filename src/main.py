@@ -21,8 +21,8 @@ def main():
     TgraphFile = "TGraph.png" # Only used for diffusion GAN
     
     loadDir = "models"
-    genLoadFile = "gen_model - 50.pkl"
-    discLoadFile = "disc_model - 50.pkl"
+    genLoadFile = "gen_model.pkl"
+    discLoadFile = "disc_model.pkl"
     
     
     
@@ -118,14 +118,12 @@ def main():
     ### Training The Model ###
     #model.loadModels(loadDir, genLoadFile, discLoadFile)
     model.train_model(sentences, epochs)
-    #model.loadModels(loadDir, genLoadFile, discLoadFile)
     print()
     
     
     ### Model Saving and Predictions ###
     noise = torch.rand((sequence_length), requires_grad=False)
     out = model.generator(noise)
-    #model.saveModels(saveDir, genSaveFile, discSaveFile)
     for i in out:
         print(vocab[i.item()], end=" ")
     

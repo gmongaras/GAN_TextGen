@@ -116,9 +116,10 @@ class Generator(nn.Module):
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
             # Send the input through the tranformer blocks
-            output = Y
-            for block in self.transBlocks:
-                output = block(w[:, 0:Y.shape[1]], output)
+            output = Y.clone()
+            n = w[:, 0:Y.shape[1]]
+            for block in self.outEmb:
+                output = block(n, output)
                 
             # Send the input through the output MHA blocks
             for block in self.outEmb:
