@@ -15,13 +15,13 @@ def main():
     vocab_file = "vocab_fortunes.csv"
     
     # Saving/Loading paramters
-    saveDir = "models"
+    saveDir = "models-gumb"
     genSaveFile = "gen_model.pkl"
     discSaveFile = "disc_model.pkl"
     trainGraphFile = "trainGraph.png"
     TgraphFile = "TGraph.png" # Only used for diffusion GAN
     
-    loadDir = "models"
+    loadDir = "models-gumb"
     genLoadFile = "gen_model.pkl"
     discLoadFile = "disc_model.pkl"
     
@@ -46,20 +46,20 @@ def main():
     ### Create the model ###
     
     # Model paramters
-    M_gen = 2                # Number of noise encoding blocks in the generator
-    B_gen = 2                # Number of generator blocks in the generator
+    M_gen = 6                # Number of noise encoding blocks in the generator
+    B_gen = 6                # Number of generator blocks in the generator
     O_gen = 2                # Number of MHA blocks in the generator
     gausNoise = True         # True to add pure gaussian noise in the generator output
                              # encoding, False to not add this noise
-    T_disc = 2               # Number of transformer blocks in each discriminator block
-    B_disc = 2               # Number of discriminator blocks in the discriminator
+    T_disc = 6               # Number of transformer blocks in each discriminator block
+    B_disc = 4               # Number of discriminator blocks in the discriminator
     O_disc = 2               # Number of output MHA blocks in the discrimiantor
-    batchSize = 10           # Batch size for the entire model
-    embedding_size_gen = 20  # Embedding size of the generator
-    embedding_size_disc = 20 # Embedding size of the discriminator
+    batchSize = 64           # Batch size for the entire model
+    embedding_size_gen = 64  # Embedding size of the generator
+    embedding_size_disc = 64 # Embedding size of the discriminator
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
-    num_heads = 2            # Number of heads in each MHA block
+    num_heads = 8            # Number of heads in each MHA block
     
     # Training parameters
     trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
@@ -71,11 +71,11 @@ def main():
     Beta1 = 0                   # Adam beta 1 term
     Beta2 = 0.9                 # Adam beta 2 term
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
-    device = "cpu"              # cpu, partgpu, or fullgpu
+    device = "partgpu"          # cpu, partgpu, or fullgpu
     epochs = 300000             # Number of epoch to train the model
-    trainingRatio = [1, 5]      # Number of epochs to train the generator (0) vs the discriminator (1)
+    trainingRatio = [1, 6]      # Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = -1             # Decrease the ratio after every decRatRate steps (-1 for not decrease)
-    saveSteps = 10              # Number of steps until the model is saved
+    saveSteps = 1000            # Number of steps until the model is saved
     loadInEpoch = False         # Should the data be loaded in as needed instead of
                                 # before training (True if so, False to load before training)
     delWhenLoaded = True        # Delete the data as it's loaded in to save space?
@@ -85,8 +85,8 @@ def main():
     Beta_0 = 0.0001             # Lowest possible Beta value, when t is 0
     Beta_T = 0.02               # Highest possible Beta value, when t is T
     T_min = 5                   # Min diffusion steps when corrupting the data
-    T_max = 1000                # Max diffusion steps when corrupting the data
-    sigma = 0.05                # Standard deviation of the noise to add to the data
+    T_max = 500                 # Max diffusion steps when corrupting the data
+    sigma = 0.5                 # Standard deviation of the noise to add to the data
     d_target = 0.6              # Term used for the T scheduler denoting if the T change should
                                 # be positive of negative depending on the disc output
     C = 1                       # Constant for the T scheduler multiplying the change of T

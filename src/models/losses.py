@@ -1,4 +1,3 @@
-from anyio import run_sync_in_worker_thread
 import torch
 
 
