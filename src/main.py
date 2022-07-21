@@ -11,8 +11,8 @@ from helpers.helpers import loadVocab
 
 def main():
     # Paramters
-    input_file = "data/Fortunes/data.txt"
-    vocab_file = "vocab_fortunes.csv"
+    input_file = "../data/Fortunes/data.txt"
+    vocab_file = "../vocab_fortunes.csv"
     
     # Saving/Loading paramters
     saveDir = "models"
@@ -46,23 +46,23 @@ def main():
     ### Create the model ###
     
     # Model paramters
-    M_gen = 10                # Number of noise encoding blocks in the generator
-    B_gen = 10                # Number of generator blocks in the generator
+    M_gen = 2                # Number of noise encoding blocks in the generator
+    B_gen = 2                # Number of generator blocks in the generator
     O_gen = 2                # Number of MHA blocks in the generator
     gausNoise = True         # True to add pure gaussian noise in the generator output
                              # encoding, False to not add this noise
     T_disc = 2               # Number of transformer blocks in each discriminator block
     B_disc = 2               # Number of discriminator blocks in the discriminator
     O_disc = 2               # Number of output MHA blocks in the discrimiantor
-    batchSize = 64           # Batch size for the entire model
-    embedding_size_gen = 64  # Embedding size of the generator
-    embedding_size_disc = 64 # Embedding size of the discriminator
+    batchSize = 10           # Batch size for the entire model
+    embedding_size_gen = 20  # Embedding size of the generator
+    embedding_size_disc = 20 # Embedding size of the discriminator
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
-    num_heads = 8            # Number of heads in each MHA block
+    num_heads = 2            # Number of heads in each MHA block
     
     # Training parameters
-    trainingMode = "norm"        # How should the models be trained ("gan", "diff", or "norm")
+    trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
     pooling = "avg"             # Pooling mode for the discriminator blocks ("avg", "max", or "none")
     gen_outEnc_mode = "norm"    # How should the outputs of the generator be encoded? ("norm" or "gumb")
     embed_mode_gen = "norm"     # Embedding mode for the generator ("norm" or "custom")
