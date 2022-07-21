@@ -11,8 +11,8 @@ from helpers.helpers import loadVocab
 
 def main():
     # Paramters
-    input_file = "../data/Fortunes/data.txt"
-    vocab_file = "../vocab_fortunes.csv"
+    input_file = "data/Fortunes/data.txt"
+    vocab_file = "vocab_fortunes.csv"
     
     # Saving/Loading paramters
     saveDir = "models"
