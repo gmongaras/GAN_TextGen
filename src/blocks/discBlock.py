@@ -7,16 +7,17 @@ from torch import nn
 
 class discBlock(nn.Module):
     # Inputs:
+    #   T - The number of transformer blocks before pooling
     #   embedding_size - The size of the embeddings of the input into
     #                    this block
-    #   sequence_length - The length of the sequence as input
     #   num_heads - Number of heads in the MHA module
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
-    def __init__(self, embedding_size, sequence_length, num_heads, pooling):
+    def __init__(self, T, embedding_size, num_heads, pooling):
         super(discBlock, self).__init__()
         
-        # The transformer block
-        self.trans = inTrans(embedding_size, num_heads, embedding_size)
+        # The transformer blocks
+        self.trans = [inTrans(embedding_size, num_heads, embedding_size) for i in range(T)]
+        self.trans = nn.Sequential(*self.trans)
         
         # Average pooling layer to
         if pooling == "max":

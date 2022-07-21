@@ -5,6 +5,8 @@ from blocks.inTrans import inTrans
 from blocks.outTrans import outTrans
 from blocks.PositionalEncoding import PositionalEncoding
 from blocks.CustomEmb import CustomEmb
+from blocks.MHA import MHA
+from blocks.MHAwithNorm import MHAwithNorm
 
 
 
@@ -13,7 +15,11 @@ class Generator(nn.Module):
     # Inputs:
     #   vocab - The vocabulary of the model
     #   M - Number of input embedding blocks
-    #   N - Number of output embedding blocks
+    #   B - Number of transformer blocks when encoding the output
+    #   O - Number of MHA blocks after the transformer blocks
+    #       when encoding the output
+    #   gausNoise - True to add pure gaussian noise in the B output blocks,
+    #               False to not add gaussian noise
     #   batchSize - Size of the batch of sentences to generate
     #   embedding_size - Size of each word embedding
     #   sequence_length - Max sequence length of the output sentence
@@ -21,12 +27,13 @@ class Generator(nn.Module):
     #   embed_mode - What embedding mode should be used for the
     #                generator? ("norm" or "custom")
     #   device - The device to put the model on
-    def __init__(self, vocab, M, N, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device):
+    def __init__(self, vocab, M, B, O, gausNoise, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device):
         super(Generator, self).__init__()
         
         # Saved states
         self.vocab = vocab
         self.vocab_inv = {vocab[i]:i for i in vocab.keys()}
+        self.gausNoise = gausNoise
         self.batchSize = batchSize
         self.embedding_size = embedding_size
         self.sequence_length = sequence_length
@@ -40,8 +47,11 @@ class Generator(nn.Module):
         modules = [nn.Linear(self.sequence_length, self.sequence_length) for i in range(M)]
         self.inEmb2 = nn.Sequential(*modules).to(device)
         
-        # Output Embedding (<Start> to some output sequence)
-        self.outEmb = nn.ModuleList([outTrans(embedding_size, embedding_size, num_heads, embedding_size, device) for i in range(N)]).to(device)
+        # Transformer blocks
+        self.transBlocks = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, embedding_size, device) for i in range(B)]).to(device)
+        
+        # Output embedding MHA blocks
+        self.outEmb = nn.ModuleList([MHAwithNorm(embedding_size, embedding_size, embedding_size, num_heads) for i in range(O)]).to(device)
         
         # If the embed_mode is "custom", use the custom embedding mode
         if embed_mode == "custom":
@@ -105,10 +115,15 @@ class Generator(nn.Module):
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
-            # Send the output through the output decoder
-            output = Y
+            # Send the input through the tranformer blocks
+            output = Y.clone()
+            n = w[:, 0:Y.shape[1]]
             for block in self.outEmb:
-                output = block(w[:, 0:Y.shape[1]], output)
+                output = block(n, output)
+                
+            # Send the input through the output MHA blocks
+            for block in self.outEmb:
+                output = block(output, output)
                 
             # Get the token from the output
             out_tok = output[:, tok-1]
@@ -171,10 +186,14 @@ class Generator(nn.Module):
             # Add positional encodings to the transformed input
             Y_hat += posEnc[:, 0:tok]
             
-            # Send the output through the output decoder
+            # Send the output through the transformer blocks
             output = Y_hat
-            for block in self.outEmb:
+            for block in self.transBlocks:
                 output = block(w[:, 0:Y_hat.shape[1]], output)
+                
+            # Send the input through the output MHA blocks
+            for block in self.outEmb:
+                output = block(output, output)
                 
             # Get the token from the output
             out_tok = output[:, tok-1]
@@ -256,10 +275,14 @@ class Generator(nn.Module):
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
-            # Send the output through the output decoder
+            # Send the input through the tranformer blocks
             output = Y
-            for block in self.outEmb:
+            for block in self.transBlocks:
                 output = block(w[:, 0:Y.shape[1]], output)
+                
+            # Send the input through the output MHA blocks
+            for block in self.outEmb:
+                output = block(output, output)
                 
             # Get the token from the output
             out_tok = output[:, tok-1]
@@ -324,10 +347,14 @@ class Generator(nn.Module):
             # Add positional encodings to the transformed input
             Y_hat += posEnc[:, 0:tok]
             
-            # Send the output through the output decoder
+            # Send the output through the transformer blocks
             output = Y_hat
-            for block in self.outEmb:
+            for block in self.transBlocks:
                 output = block(w[:, 0:Y_hat.shape[1]], output)
+                
+            # Send the input through the output MHA blocks
+            for block in self.outEmb:
+                output = block(output, output)
                 
             # Get the token from the output
             out_tok = output[:, tok-1]
