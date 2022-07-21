@@ -26,8 +26,11 @@ class Generator(nn.Module):
     #   num_heads - Number of heads in the MHA modules
     #   embed_mode - What embedding mode should be used for the
     #                generator? ("norm" or "custom")
+    #   outEnc - What encodning mode should be used for the
+    #            output sequences which will be fed into the
+    #            discriminator? ("norm", "gumb")
     #   device - The device to put the model on
-    def __init__(self, vocab, M, B, O, gausNoise, batchSize, embedding_size, sequence_length, num_heads, embed_mode, device):
+    def __init__(self, vocab, M, B, O, gausNoise, batchSize, embedding_size, sequence_length, num_heads, embed_mode, outEnc, device):
         super(Generator, self).__init__()
         
         # Saved states
@@ -39,6 +42,7 @@ class Generator(nn.Module):
         self.sequence_length = sequence_length
         embed_mode = embed_mode.lower()
         self.embed_mode = embed_mode if (embed_mode == "norm" or embed_mode == "custom") else "norm"
+        self.outEnc = outEnc.lower()
         self.device = device
         
         # Input embedding (noise to some sort of embedding)
@@ -68,6 +72,10 @@ class Generator(nn.Module):
             nn.Linear(embedding_size, len(self.vocab.keys())),
             nn.Softmax(-1),
         ).to(device)
+        
+        # Potential Gumbel Linear block for the output
+        if outEnc == "gumb":
+            self.gumb_linear = nn.Linear(embedding_size, len(self.vocab.keys())).to(device)
     
     
     
@@ -285,13 +293,19 @@ class Generator(nn.Module):
                 output = block(output, output)
                 
             # Get the token from the output
-            out_tok = output[:, tok-1]
+            out_tok_b = output[:, tok-1]
             
             # Send the output through a softmax block
-            out_tok_soft = self.soft(out_tok)
+            out_tok_soft = self.soft(out_tok_b)
             
             # Get the argmax of the output tokens
             out_tok = torch.argmax(out_tok_soft, dim=-1)
+            
+            # If the output encoding mode is "gumb", then
+            # use the softmax gumbel function as opposed
+            # to the softmax function
+            if (self.outEnc == "gumb"):
+                out_tok_soft = torch.nn.functional.gumbel_softmax(torch.log(torch.clamp(self.gumb_linear(out_tok_b), 0.00001, torch.inf)), dim=-1)
             
             # Save the softmax output
             for i in range(self.batchSize):
@@ -357,13 +371,19 @@ class Generator(nn.Module):
                 output = block(output, output)
                 
             # Get the token from the output
-            out_tok = output[:, tok-1]
+            out_tok_b = output[:, tok-1]
             
             # Send the output through a softmax block
-            out_tok_soft = self.soft(out_tok)
+            out_tok_soft = self.soft(out_tok_b)
             
             # Get the argmax of the output tokens
             out_tok = torch.argmax(out_tok_soft, dim=-1)
+            
+            # If the output encoding mode is "gumb", then
+            # use the softmax gumbel function as opposed
+            # to the softmax function
+            if (self.outEnc == "gumb"):
+                out_tok_soft = torch.nn.functional.gumbel_softmax(torch.log(torch.clamp(self.gumb_linear(out_tok_b), 0.00001, torch.inf)), dim=-1)
             
             # Save the softmax output
             for i in range(self.batchSize):

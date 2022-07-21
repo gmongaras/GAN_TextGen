@@ -61,8 +61,9 @@ def main():
     num_heads = 2            # Number of heads in each MHA block
     
     # Training parameters
-    trainingMode = "diff"        # How should the models be trained ("gan" or "diff")
+    trainingMode = "gan"        # How should the models be trained ("gan" or "diff")
     pooling = "avg"             # Pooling mode for the discriminator blocks ("avg", "max", or "none")
+    gen_outEnc_mode = "gumb"    # How should the outputs of the generator be encoded? ("norm" or "gumb")
     embed_mode_gen = "norm"     # Embedding mode for the generator ("norm" or "custom")
     embed_mode_disc = "fc"      # Embedding mode for the discriminator ("fc" or "pca")
     alpha = 0.0001              # Model learning rate
@@ -71,7 +72,7 @@ def main():
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
     device = "cpu"              # cpu, partgpu, or fullgpu
     epochs = 300000             # Number of epoch to train the model
-    trainingRatio = [1, 1]      # Number of epochs to train the generator (0) vs the discriminator (1)
+    trainingRatio = [1, 5]      # Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = -1             # Decrease the ratio after every decRatRate steps (-1 for not decrease)
     saveSteps = 10              # Number of steps until the model is saved
     loadInEpoch = False         # Should the data be loaded in as needed instead of
@@ -95,7 +96,7 @@ def main():
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
                 sequence_length, num_heads,
-                trainingRatio, decRatRate, pooling, 
+                trainingRatio, decRatRate, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
@@ -107,7 +108,7 @@ def main():
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
                 sequence_length, num_heads,
-                trainingRatio, decRatRate, pooling, 
+                trainingRatio, decRatRate, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 

@@ -59,6 +59,7 @@ class Diff_GAN_Model(nn.Module):
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
     #                never decrease the ratio
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
+    #   gen_outEnc_mode - How should the generator encode its output? ("norm" or "gumb")
     #   embed_mode_gen - What embedding mode should be used for the
     #                    generator? ("norm" or "custom")
     #   embed_mode_disc - What embedding mode should be used for the
@@ -87,7 +88,7 @@ class Diff_GAN_Model(nn.Module):
     #               T change should be positive of negative depending 
     #               on the disc output
     #   C - Constant for the T scheduler multiplying the change of T
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, trainingRatio, decRatRate, pooling, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, trainingRatio, decRatRate, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
         super(Diff_GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -138,10 +139,10 @@ class Diff_GAN_Model(nn.Module):
         
         # The generator and discriminator models
         if self.dev != "cpu":
-            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gpu)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
             self.discriminator = Discriminator(T_disc, B_disc, O_disc, "sigmoid", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
         else:
-            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, device)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
             self.discriminator = Discriminator(T_disc, B_disc, O_disc, "sigmoid", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
         
         # The optimizer for the model
