@@ -36,5 +36,5 @@ class MHAwithNorm(nn.Module):
        # MHA output
        O = self.MHA(X_1, X_2)
        
-       # Return the nromalized output
-       return self.LN(O) + X_2
+       # Return the normalized output
+       return self.LN(O.contiguous()) + X_2

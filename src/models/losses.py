@@ -1,5 +1,20 @@
+from anyio import run_sync_in_worker_thread
 import torch
 
+
+
+# Loss function for the normal model which directly evaluates the output
+# of the generator based on what the actual output should be
+# Inputs:
+#   Y_fake - The generated output from the model to evaluate
+#   Y - The real data we want Y_fake to be
+def binary_cross_entropy_loss(Y_fake, Y):
+    # Clamp the input between 0.00001 and infinity to avoid
+    # nan or -inf loss values
+    Y_fake = torch.clamp(Y_fake, 0.00001, torch.inf)
+
+    # Return the binary cross entropy loss
+    return torch.nn.BCELoss(reduction="mean")(Y_fake, Y)
 
 
 

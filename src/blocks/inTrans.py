@@ -35,11 +35,11 @@ class inTrans(nn.Module):
         X_saved = X.clone()
         X = self.MHA(X, X)
         X += X_saved
-        X = self.LN1(X)
+        X = self.LN1(X.contiguous())
         
         X_saved = X.clone()
         X = self.FF(X)
         X = self.ReLU(X) + 0
         X += X_saved
-        X = self.LN2(X)
+        X = self.LN2(X.contiguous())
         return X

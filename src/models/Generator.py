@@ -40,7 +40,7 @@ class Generator(nn.Module):
         self.batchSize = batchSize
         self.embedding_size = embedding_size
         self.sequence_length = sequence_length
-        embed_mode = embed_mode.lower()
+        self.embed_mode = embed_mode.lower()
         self.embed_mode = embed_mode if (embed_mode == "norm" or embed_mode == "custom") else "norm"
         self.outEnc = outEnc.lower()
         self.device = device

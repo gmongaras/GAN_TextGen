@@ -49,7 +49,7 @@ class outTrans(nn.Module):
     def forward(self, X_1, X_2):
         X = self.MHA1(X_2, X_2)
         X += X_2
-        X = self.LN1(X)
+        X = self.LN1(X.contiguous())
         
         # Add gaussian noise if set to true
         if self.gausNoise:
@@ -58,11 +58,11 @@ class outTrans(nn.Module):
         X_saved = X.clone()
         X = self.MHA2(X_1, X)
         X += X_saved
-        X = self.LN2(X)
+        X = self.LN2(X.contiguous())
         
         X_saved = X.clone()
         X = self.FF(X)
         X = self.ReLU(X) + 0
         X += X_saved
-        X = self.LN3(X)
+        X = self.LN3(X.contiguous())
         return X

@@ -32,7 +32,13 @@ from diffusion_resources.schedulers import T_scheduler
 
 
 cpu = torch.device('cpu')
-gpu = torch.device('cuda:0')
+try:
+    if torch.has_mps:
+        gpu = torch.device("mps")
+    else:
+        gpu = torch.device('cuda:0')
+except:
+    gpu = torch.device('cuda:0')
 
 
 
@@ -127,6 +133,9 @@ class Diff_GAN_Model(nn.Module):
             if torch.cuda.is_available():
                 dev = device.lower()
                 device = torch.device('cuda:0')
+            elif torch.has_mps == True:
+                dev = "mps"
+                device = torch.device('mps')
             else:
                 dev = "cpu"
                 print("GPU not available, defaulting to CPU. Please ignore this message if you do not wish to use a GPU\n")
@@ -229,19 +238,19 @@ class Diff_GAN_Model(nn.Module):
                         
                         # Save the data
                         if len(x) == 0:
-                            x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                            x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
                         else:
-                            x = np.concatenate((x, np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)[self.batchSize-x.shape[0]:]))
+                            x = np.concatenate((x, np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)[self.batchSize-x.shape[0]:]))
                     
                     # If disc_nums is empty, a problem occured
-                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence langth"
+                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
                 else:
-                    x = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
+                    x = X_orig_one_hot[disc_sub.cpu().numpy()]
                 
                 # Get a batch of real data and add padding
                 # to it
                 if self.loadInEpoch == True:
-                    x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()], self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                    x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()], self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
                 else:
                     x = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
                 x = addPadding_one_hot(x, self.vocab_inv, self.sequence_length)

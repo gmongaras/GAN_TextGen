@@ -1,6 +1,7 @@
 import torch
 from Diff_GAN_Model import Diff_GAN_Model
 from GAN_Model import GAN_Model
+from Norm_Model import Norm_Model
 from helpers.helpers import loadVocab
 
 
@@ -10,7 +11,7 @@ from helpers.helpers import loadVocab
 
 def main():
     # Paramters
-    input_file = "data/Fortunes/data_small.txt"
+    input_file = "data/Fortunes/data.txt"
     vocab_file = "vocab_fortunes.csv"
     
     # Saving/Loading paramters
@@ -45,25 +46,25 @@ def main():
     ### Create the model ###
     
     # Model paramters
-    M_gen = 2                # Number of noise encoding blocks in the generator
-    B_gen = 2                # Number of generator blocks in the generator
+    M_gen = 10                # Number of noise encoding blocks in the generator
+    B_gen = 10                # Number of generator blocks in the generator
     O_gen = 2                # Number of MHA blocks in the generator
     gausNoise = True         # True to add pure gaussian noise in the generator output
                              # encoding, False to not add this noise
     T_disc = 2               # Number of transformer blocks in each discriminator block
     B_disc = 2               # Number of discriminator blocks in the discriminator
     O_disc = 2               # Number of output MHA blocks in the discrimiantor
-    batchSize = 10           # Batch size for the entire model
-    embedding_size_gen = 20  # Embedding size of the generator
-    embedding_size_disc = 20 # Embedding size of the discriminator
+    batchSize = 64           # Batch size for the entire model
+    embedding_size_gen = 64  # Embedding size of the generator
+    embedding_size_disc = 64 # Embedding size of the discriminator
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
-    num_heads = 2            # Number of heads in each MHA block
+    num_heads = 8            # Number of heads in each MHA block
     
     # Training parameters
-    trainingMode = "gan"        # How should the models be trained ("gan" or "diff")
+    trainingMode = "norm"        # How should the models be trained ("gan", "diff", or "norm")
     pooling = "avg"             # Pooling mode for the discriminator blocks ("avg", "max", or "none")
-    gen_outEnc_mode = "gumb"    # How should the outputs of the generator be encoded? ("norm" or "gumb")
+    gen_outEnc_mode = "norm"    # How should the outputs of the generator be encoded? ("norm" or "gumb")
     embed_mode_gen = "norm"     # Embedding mode for the generator ("norm" or "custom")
     embed_mode_disc = "fc"      # Embedding mode for the discriminator ("fc" or "pca")
     alpha = 0.0001              # Model learning rate
@@ -103,7 +104,7 @@ def main():
                 genSaveFile, discSaveFile, trainGraphFile,
                 TgraphFile, loadInEpoch, delWhenLoaded,
                 Beta_0, Beta_T, T_min, T_max, sigma, d_target, C)
-    else:
+    elif trainingMode.lower() == "gan":
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
@@ -114,6 +115,12 @@ def main():
                 Beta1, Beta2, device, saveSteps, saveDir, 
                 genSaveFile, discSaveFile, trainGraphFile,
                 loadInEpoch, delWhenLoaded)
+    else:
+        model = Norm_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
+                batchSize, embedding_size_gen, sequence_length, num_heads,
+                gen_outEnc_mode, embed_mode_gen, alpha, Lambda,
+                Beta1, Beta2, device, saveSteps, saveDir, genSaveFile,
+                trainGraphFile, loadInEpoch, delWhenLoaded)
     
     
     ### Training The Model ###

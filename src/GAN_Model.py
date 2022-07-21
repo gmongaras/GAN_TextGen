@@ -24,7 +24,13 @@ import os
 
 
 cpu = torch.device('cpu')
-gpu = torch.device('cuda:0')
+try:
+    if torch.has_mps:
+        gpu = torch.device("mps")
+    else:
+        gpu = torch.device('cuda:0')
+except:
+    gpu = torch.device('cuda:0')
 
 
 
@@ -100,6 +106,9 @@ class GAN_Model(nn.Module):
             if torch.cuda.is_available():
                 dev = device.lower()
                 device = torch.device('cuda:0')
+            elif torch.has_mps == True:
+                dev = "mps"
+                device = torch.device('mps')
             else:
                 dev = "cpu"
                 print("GPU not available, defaulting to CPU. Please ignore this message if you do not wish to use a GPU\n")
@@ -233,14 +242,14 @@ class GAN_Model(nn.Module):
                         
                         # Save the data
                         if len(real_X) == 0:
-                            real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)
+                            real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
                         else:
-                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().detach().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, self.device), dtype=object)[:self.batchSize-real_X.shape[0]]))
+                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)[:self.batchSize-real_X.shape[0]]))
                     
                     # If disc_nums is empty, a problem occured
-                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence langth"
+                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
                 else:
-                    real_X = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
+                    real_X = X_orig_one_hot[disc_sub.cpu().numpy()]
                 
                 # Add padding to the subset
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
