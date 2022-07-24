@@ -1,13 +1,13 @@
-from helpers.helpers import encode_sentences
-from helpers.helpers import encode_sentences_one_hot
-from helpers.helpers import addPadding
-from helpers.helpers import addPadding_one_hot
+from ..helpers.helpers import encode_sentences
+from ..helpers.helpers import encode_sentences_one_hot
+from ..helpers.helpers import addPadding
+from ..helpers.helpers import addPadding_one_hot
 
 
-from models.losses import binary_cross_entropy_loss
+from .models.losses import binary_cross_entropy_loss
 
 
-from models.Generator import Generator
+from .models.Generator import Generator
 import torch
 from torch import nn
 import numpy as np

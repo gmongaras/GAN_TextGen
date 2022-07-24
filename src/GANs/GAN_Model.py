@@ -1,19 +1,19 @@
-from helpers.helpers import encode_sentences
-from helpers.helpers import encode_sentences_one_hot
-from helpers.helpers import addPadding
-from helpers.helpers import addPadding_one_hot
+from ..helpers.helpers import encode_sentences
+from ..helpers.helpers import encode_sentences_one_hot
+from ..helpers.helpers import addPadding
+from ..helpers.helpers import addPadding_one_hot
 
 
-from models.losses import wasserstein_disc
-from models.losses import wasserstein_disc_split
-from models.losses import wasserstein_gen
-from models.losses import minimax_disc
-from models.losses import minimax_gen
-from models.losses import minimax_loss
+from .models.losses import wasserstein_disc
+from .models.losses import wasserstein_disc_split
+from .models.losses import wasserstein_gen
+from .models.losses import minimax_disc
+from .models.losses import minimax_gen
+from .models.losses import minimax_loss
 
 
-from models.Generator import Generator
-from models.Discriminator import Discriminator
+from .models.Generator import Generator
+from .models.Discriminator import Discriminator
 import torch
 from torch import nn
 import numpy as np

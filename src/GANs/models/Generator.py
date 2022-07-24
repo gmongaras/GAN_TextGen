@@ -1,12 +1,11 @@
 from torch import nn
 import torch
 import os
-from blocks.inTrans import inTrans
-from blocks.outTrans import outTrans
-from blocks.PositionalEncoding import PositionalEncoding
-from blocks.CustomEmb import CustomEmb
-from blocks.MHA import MHA
-from blocks.MHAwithNorm import MHAwithNorm
+from ..blocks.outTrans import outTrans
+from ..blocks.PositionalEncoding import PositionalEncoding
+from ..blocks.CustomEmb import CustomEmb
+from ..blocks.MHA import MHA
+from ..blocks.MHAwithNorm import MHAwithNorm
 
 
 

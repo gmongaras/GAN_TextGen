@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from blocks.LSTM import LSTM_Module
+from ..blocks.LSTM import LSTM_Module
 
 
 

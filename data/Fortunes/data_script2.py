@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 
 
 
-outFile = "data/data.txt"
+outFile = "data/Fortunes/data.txt"
 siteName = "http://www.fortunecookiemessage.com/archive.php?start="
 low = 0
 high = 839
@@ -12,7 +12,7 @@ skip = 50
 
 
 # Open the file
-file = open(outFile, "a")
+file = open(outFile, "a", encoding="utf-8")
 
 # Get all fortunes
 for cur in range(low, high, skip):

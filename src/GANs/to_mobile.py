@@ -5,9 +5,9 @@
 import torch
 import torchvision
 from torch.utils.mobile_optimizer import optimize_for_mobile
-from models.Generator import Generator
+from .models.Generator import Generator
 import os
-from helpers.helpers import loadVocab
+from ..helpers.helpers import loadVocab
 
 
 

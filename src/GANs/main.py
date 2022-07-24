@@ -1,8 +1,8 @@
 import torch
-from Diff_GAN_Model import Diff_GAN_Model
-from GAN_Model import GAN_Model
-from Norm_Model import Norm_Model
-from helpers.helpers import loadVocab
+from .Diff_GAN_Model import Diff_GAN_Model
+from .GAN_Model import GAN_Model
+from .Norm_Model import Norm_Model
+from ..helpers.helpers import loadVocab
 
 
 
@@ -71,7 +71,7 @@ def main():
     Beta1 = 0                   # Adam beta 1 term
     Beta2 = 0.9                 # Adam beta 2 term
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
-    device = "partgpu"          # cpu, partgpu, or fullgpu
+    device = "cpu"              # cpu, partgpu, or fullgpu
     epochs = 300000             # Number of epoch to train the model
     trainingRatio = [1, 6]      # Number of epochs to train the generator (0) vs the discriminator (1)
     decRatRate = -1             # Decrease the ratio after every decRatRate steps (-1 for not decrease)
@@ -136,4 +136,5 @@ def main():
         print(vocab[i.item()], end=" ")
     
     
-main()
+if __name__ == "__main__": 
+    main()

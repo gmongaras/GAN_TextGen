@@ -1,4 +1,4 @@
-from blocks.inTrans import inTrans
+from ..blocks.inTrans import inTrans
 from torch import nn
 
 

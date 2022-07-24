@@ -1,33 +1,33 @@
-from GAN_Model import GAN_Model
-from helpers.helpers import encode_sentences
-from helpers.helpers import encode_sentences_one_hot
-from helpers.helpers import addPadding
-from helpers.helpers import addPadding_one_hot
+from .GAN_Model import GAN_Model
+from ..helpers.helpers import encode_sentences
+from ..helpers.helpers import encode_sentences_one_hot
+from ..helpers.helpers import addPadding
+from ..helpers.helpers import addPadding_one_hot
 
 
-from models.losses import wasserstein_disc
-from models.losses import wasserstein_disc_split
-from models.losses import wasserstein_gen
-from models.losses import minimax_disc
-from models.losses import minimax_gen
-from models.losses import minimax_loss
-from models.losses import diff_disc
-from models.losses import diff_disc_split
-from models.losses import diff_gen
+from .models.losses import wasserstein_disc
+from .models.losses import wasserstein_disc_split
+from .models.losses import wasserstein_gen
+from .models.losses import minimax_disc
+from .models.losses import minimax_gen
+from .models.losses import minimax_loss
+from .models.losses import diff_disc
+from .models.losses import diff_disc_split
+from .models.losses import diff_gen
 
 
-from models.Generator import Generator
-from models.Discriminator import Discriminator
+from .models.Generator import Generator
+from .models.Discriminator import Discriminator
 import torch
 from torch import nn
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from diffusion_resources.distributions import y_sample
-from diffusion_resources.distributions import p_pie_sample
-from diffusion_resources.schedulers import linear_variance_scheduler
-from diffusion_resources.schedulers import T_scheduler
+from .diffusion_resources.distributions import y_sample
+from .diffusion_resources.distributions import p_pie_sample
+from .diffusion_resources.schedulers import linear_variance_scheduler
+from .diffusion_resources.schedulers import T_scheduler
 
 
 

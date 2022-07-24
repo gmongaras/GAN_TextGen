@@ -1,9 +1,9 @@
-from blocks.discBlock import discBlock
-from blocks.inTrans import inTrans
+from ..blocks.discBlock import discBlock
+from ..blocks.inTrans import inTrans
 from torch import nn
 import torch
 import os
-from blocks.MHAwithNorm import MHAwithNorm
+from ..blocks.MHAwithNorm import MHAwithNorm
 
 
 

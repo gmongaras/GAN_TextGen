@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from models.LSTM import LSTM
+from .models.LSTM import LSTM
 
 
 
@@ -8,7 +8,8 @@ from models.LSTM import LSTM
 def main():
     ### Parameters ###
     
-    # Paramters
+    # Vocabualary parameters
+    vocabType = "char"          # The vocabulary type ("word" or "char")
     input_file = "data/Fortunes/data.txt"
     vocab_file = "vocab_fortunes.csv"
     
@@ -23,7 +24,36 @@ def main():
     discLoadFile = "disc_model.pkl"
     
     
-    # ---
+    # Model parameters
+    modelType = "rnn"          # Model type to use ("rnn", "transformer", or "both")
+    outputType = "char"         # What should the model output? ("word" or "char")
+    batchSize = 128             # Batch size used when training the model
+    seqLength = 300             # Length of the sequence to train the model on
+    
+    # RNN parameters (if used)
+    #
+    
+    # Transformer parameters (if used)
+    #
+    
+    # Words parameters (if used)
+    encodingDim = 1             # Size to encode each word in the sequence to
+    
+    # Character parameters (if used)
+    #
+    
+    
+    
+    ### Load in the vocabulary and data ###
+    
+    
+    
+    
+    ### Create the model ###
+    if modelType.lower() == "transformer":
+        model = RNN()
+    else:
+        model = Transformer()
     
     
     
