@@ -2,8 +2,11 @@
 A basic text generation model for a project I'm working on
 
 
-Documentation and Log:
+Documentation/Log for GANs:
 https://docs.google.com/document/d/1UA-dEF-IMr5-mOgkp6ORRtAERDEprKHw3K_Lw9A-vmU/edit?usp=sharing
+
+Documentation/Log for networks that aren't GANs:
+https://docs.google.com/document/d/1_2mnS_jRa5RixBPNazFUxKrX-_Y-Bz9zZHglUnGHpgo/edit?usp=sharing
 
 
 
