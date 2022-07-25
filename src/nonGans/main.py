@@ -4,6 +4,7 @@ from .Model import Model
 from ..helpers.helpers import loadVocab
 from .helpers.load_chars import load_chars
 from .helpers.load_words import load_words
+from .helpers.load_both import load_both
 
 
 cpu = torch.device('cpu')
@@ -23,7 +24,7 @@ def main():
     
     # Vocabualary parameters
     input_file = "data/Fortunes/data.txt"
-    vocab_file = "vocab_charss.csv"
+    vocab_file = "vocab_chars.csv"
     
     # Saving/Loading paramters
     saveDir = "models"
@@ -37,7 +38,7 @@ def main():
     
     # Model parameters
     modelType = "rnn"           # Model type to use ("rnn", "transformer", or "both")
-    outputType = "char"         # What should the model output? ("word" or "char")
+    outputType = "char"         # What should the model output? ("word" or "char") (Note: This is not used if modelType is "both")
     epochs = 20000              # Number of epochs to train the model for
     batchSize = 128             # Batch size used when training the model
     layers = 1                  # The number of LSTM blocks stacked ontop of each other
@@ -51,10 +52,14 @@ def main():
     # Transformer parameters (if used)
     num_heads = 1               # Number of heads for each MHA block
     
+    # Both model parameters (if used)
+    #word_length = 15            # Max length of each word
+    
     # Word or Character parameters
-    seqLength = 300             # Length of the sequence to train the model on
-    input_size = 10             # (E) The embedding size of the input for each char or word
-    lower = True                # True to lowercase chars/words when embedding. False otherwise
+    seqLength = 300             # Length of the sequence to train the model on (number of words or characters)
+    input_size = 1              # (E) The embedding size of the input for each char or word
+                                # Note: If the "both" model is used, this is treated as the word length
+    lower = False               # True to lowercase chars/words when embedding. False otherwise
     
     # Words parameters (if used)
     limit = 10                  # Limit on the number of sentences to load in
@@ -71,6 +76,8 @@ def main():
     vocab_inv = {vocab[i]:i for i in vocab}
     
     # Load in the data
+    if modelType == "both":
+        X, y = load_both(input_file, seqLength, vocab_inv, input_size, lower)
     if outputType == "word":
         X, y = load_words(input_file, seqLength, vocab_inv, input_size, lower, limit)
     else:
@@ -79,6 +86,8 @@ def main():
     
     
     ### Create the model ###
+    if modelType.lower() == "both":
+        model = BothModel()
     if modelType.lower() == "transformer":
         model = Model(modelType, outputType, input_size,
                       len(vocab), layers, dropout, device, saveDir, saveFile,

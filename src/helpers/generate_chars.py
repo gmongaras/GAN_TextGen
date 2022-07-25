@@ -8,13 +8,14 @@ def generate():
     vocabFile = "data/Fortunes/data.txt"
     outFile = "vocab_chars.csv"
     limit = 1000000000000
+    startTok = "¶"
     endTok = "∅"
-    padTok = "~"
+    padTok = "↔"
     lowercase = False
     
     
     # The created vocab as each word is seen
-    vocab = {endTok: 0, padTok: 1}
+    vocab = {startTok: 0, endTok: 1, padTok: 2}
     
     i = len(vocab)
     

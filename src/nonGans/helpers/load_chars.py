@@ -17,8 +17,9 @@ import torch
 #       encoding for each sentence
 def load_chars(filename, maxLen, vocab, lower):
     # Encoded end and pad tokens
+    start_tok = [vocab["¶"]]
     end_tok = [vocab["∅"]]
-    pad_toks = [vocab["~"] for i in range(0, maxLen-1)]
+    pad_toks = [vocab["↔"] for i in range(0, maxLen-1)]
     
     # The encoded setences
     X = []
@@ -37,6 +38,9 @@ def load_chars(filename, maxLen, vocab, lower):
                 c = [vocab[i] for i in f]
             except:
                 continue
+            
+            # Add the start token to the set of characters
+            c = start_tok + c
 
             # Add the end token to the set of characters
             c += end_tok
