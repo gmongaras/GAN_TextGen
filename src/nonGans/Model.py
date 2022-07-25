@@ -93,7 +93,7 @@ class Model(nn.Module):
 
     
     
-    # Train the model given either a batch of sentences
+    # Train a model to generate words or characters
     # Inputs:
     #   X - Input into the model
     #   y - Expected output from the model
@@ -101,35 +101,6 @@ class Model(nn.Module):
     #   batchSize - Size of each minibatch
     #   saveSteps - Number of steps until a new model is saved
     def trainModel(self, X, y, epochs, batchSize, saveSteps):
-        # If the mode is "word", train the model
-        # to generate words.
-        if self.mode == "word":
-            self.train_word(X, y, epochs, batchSize, saveSteps)
-        else:
-            self.train_char(X, y, epochs, batchSize, saveSteps)
-
-    
-    
-    # Train a model to generate words
-    # Inputs:
-    #   X - Input into the model
-    #   y - Expected output from the model
-    #   epochs - Number of epochs to train the model for
-    #   batchSize - Size of each minibatch
-    #   saveSteps - Number of steps until a new model is saved
-    def train_word(self, X, y, epochs, batchSize, saveSteps):
-        pass
-
-    
-    
-    # Train a model to generate characters
-    # Inputs:
-    #   X - Input into the model
-    #   y - Expected output from the model
-    #   epochs - Number of epochs to train the model for
-    #   batchSize - Size of each minibatch
-    #   saveSteps - Number of steps until a new model is saved
-    def train_char(self, X, y, epochs, batchSize, saveSteps):
         # Ensure the data are float tensors and on the correct device
         X = X.float().to(self.device)
         y = y.float().to(self.device)

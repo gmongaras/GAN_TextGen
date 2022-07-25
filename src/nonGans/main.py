@@ -23,7 +23,7 @@ def main():
     
     # Vocabualary parameters
     input_file = "data/Fortunes/data.txt"
-    vocab_file = "vocab_chars.csv"
+    vocab_file = "vocab_charss.csv"
     
     # Saving/Loading paramters
     saveDir = "models"
@@ -36,12 +36,10 @@ def main():
     
     
     # Model parameters
-    modelType = "transformer"           # Model type to use ("rnn", "transformer", or "both")
+    modelType = "rnn"           # Model type to use ("rnn", "transformer", or "both")
     outputType = "char"         # What should the model output? ("word" or "char")
     epochs = 20000              # Number of epochs to train the model for
     batchSize = 128             # Batch size used when training the model
-    seqLength = 300             # Length of the sequence to train the model on
-    input_size = 1              # (E) The embedding size of the input for each char or word
     layers = 1                  # The number of LSTM blocks stacked ontop of each other
     dropout = 0.2               # Dropout rate in the model
     
@@ -54,10 +52,12 @@ def main():
     num_heads = 1               # Number of heads for each MHA block
     
     # Word or Character parameters
-    maxLen = 300                # Max sequence length to load in
+    seqLength = 300             # Length of the sequence to train the model on
+    input_size = 10             # (E) The embedding size of the input for each char or word
+    lower = True                # True to lowercase chars/words when embedding. False otherwise
     
     # Words parameters (if used)
-    encodingDim = 1             # Size to encode each word in the sequence to
+    limit = 10                  # Limit on the number of sentences to load in
     
     # Character parameters (if used)
     #
@@ -72,9 +72,9 @@ def main():
     
     # Load in the data
     if outputType == "word":
-        X, y = load_words()
+        X, y = load_words(input_file, seqLength, vocab_inv, input_size, lower, limit)
     else:
-        X, y = load_chars(input_file, maxLen, vocab_inv)
+        X, y = load_chars(input_file, seqLength, vocab_inv, lower)
     
     
     

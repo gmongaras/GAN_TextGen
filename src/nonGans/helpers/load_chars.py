@@ -9,18 +9,13 @@ import torch
 #   filename - The filename with the data to load in
 #   maxLen - Max number of characters to load in for each input sentence
 #   vocab - Dictionary mapping characters to their integer encoding
+#   lower - Should the characters be lowercased when embedding?
 # Output:
 #   X - A tensor of shape (N, maxLen, 1) which is the character encoding
 #       for each sentence
 #   y - A tensor of shape (N, maxLen, vocabSize) which is the one-hot
 #       encoding for each sentence
-def load_chars(filename, maxLen, vocab):
-    # Does the vocabulary have capital letters?
-    lower = True
-    for char in vocab:
-        if char.isupper() and char.isalpha():
-            lower = False
-    
+def load_chars(filename, maxLen, vocab, lower):
     # Encoded end and pad tokens
     end_tok = [vocab["∅"]]
     pad_toks = [vocab["~"] for i in range(0, maxLen-1)]
