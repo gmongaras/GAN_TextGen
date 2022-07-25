@@ -6,13 +6,20 @@ from nltk.tokenize import word_tokenize
 
 def loadVocab(vocab_file):
     vocab = {}
-    vocabFile = open(vocab_file, "r")
+    vocabFile = open(vocab_file, "r", encoding="utf-8")
     for line in vocabFile:
+        # If the line is empty, skip it
+        if len(line) < 2:
+            continue
+        
         # Clean the line
-        line = line.strip()
+        if not line[2].isspace():
+            line = line.strip()
+        else:
+            line = line[:3]
         
         # Get the key and value
-        line = line.split(',')
+        line = line.split(',', 1)
         
         # Add to the vocab
         vocab[int(line[0])] = line[1]

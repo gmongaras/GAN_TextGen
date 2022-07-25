@@ -8,7 +8,7 @@ def generate():
     vocabFile = "data/Fortunes/data.txt"
     outFile = "vocab_chars.csv"
     limit = 1000000000000
-    endTok = "\a"
+    endTok = "∅"
     padTok = "~"
     lowercase = False
     
@@ -21,10 +21,6 @@ def generate():
     # Iterate over all lines in the file
     file = open(vocabFile, "r", encoding='utf-8')
     for line in file:
-        
-        # Clean the line
-        line = line.strip()
-        
         # Iterate over each character in the line:
         for char in line:
             # Make the character lowercased
