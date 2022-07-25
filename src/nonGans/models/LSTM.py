@@ -21,8 +21,9 @@ class LSTM(nn.Module):
         self.linear = nn.Linear(hidden_size, vocab_size)
 
 
-    # Forward method to get softmax outputs from
-    # a sequence of inputs
+    # Forward method to get outputs from
+    # a sequence of inputs. Note, these are not
+    # softmax output, rather linear outputs
     # Inputs:
     #   x - A batch of sequence of inputs of shape (N, S, E)
     # Outputs:

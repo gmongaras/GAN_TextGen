@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from .models.LSTM import LSTM, LSTM_torch
+from .models.Transformer import Transformer
 import os
 
 
@@ -17,20 +18,23 @@ except:
 
 
 
-class RNN(nn.Module):
+class Model(nn.Module):
+    # modelType - What model should be used? ("transformer" or "rnn")
     # mode - What should the model output? ("word" or "char")
     # input_size (E) - The embedding size of the input.
-    # hidden_size (H) - The size of the hidden state
     # vocab_size (V) - The size of the vocab to predict from
     # layers - The number of LSTM blocks stacked ontop of each other
     # dropout - Rate to apply dropout to the model
     # device - Deivce to put the model on
     # saveDir - Directory to save model to
     # saveFile - File to save model to
-    def __init__(self, mode, input_size, hidden_size, vocab_size, layers, dropout, device, saveDir, saveFile):
-        super(RNN, self).__init__()
+    # num_heads - The number of heads for the Transformer model only
+    # hidden_size (H) - The size of the hidden state for the RNN model only
+    def __init__(self, modelType, mode, input_size, vocab_size, layers, dropout, device, saveDir, saveFile, num_heads=None, hidden_size=None):
+        super(Model, self).__init__()
         
         # Saved variables
+        self.modelType = modelType.lower()
         self.mode = mode.lower()
         self.saveDir = saveDir
         self.saveFile = saveFile
@@ -53,11 +57,17 @@ class RNN(nn.Module):
         self.device = device
         self.dev = dev
         
-        # Use an LSTM
-        if dev == "partgpu":
-            self.model = LSTM_torch(input_size, hidden_size, vocab_size, layers, dropout, gpu)
+        # Use an LSTM or Transformer
+        if self.modelType == "transformer":
+            if dev == "partgpu":
+                self.model = Transformer(layers, input_size, vocab_size, num_heads, input_size, gpu)
+            else:
+                self.model = Transformer(layers, input_size, vocab_size, num_heads, input_size, device)
         else:
-            self.model = LSTM_torch(input_size, hidden_size, vocab_size, layers, dropout, device)
+            if dev == "partgpu":
+                self.model = LSTM_torch(input_size, hidden_size, vocab_size, layers, dropout, gpu)
+            else:
+                self.model = LSTM_torch(input_size, hidden_size, vocab_size, layers, dropout, device)
         
         # Optimizer
         self.optim = torch.optim.Adam(self.parameters())
@@ -147,14 +157,16 @@ class RNN(nn.Module):
                 # Get the model predictions
                 preds = self.model(X_b)
 
-                # Get the loss
+                # Get the loss. Note that the predictions start at S = 1
+                # while the y labels start at S = 0. So, we have to align
+                # them properly by removing the first S label and the
+                # last S prediction.
                 loss = self.loss(preds[:, :-1].permute(0, 2, 1), y_b[:, 1:].permute(0, 2, 1)).mean()
 
                 # Update the model
                 loss.backward()
                 self.optim.step()
                 self.optim.zero_grad()
-                break
                 
             # Save the model
             if epoch%saveSteps == 0:
