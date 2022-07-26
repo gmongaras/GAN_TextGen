@@ -36,7 +36,7 @@ class BothModel(nn.Module):
         
         # Linear layer to convert the context from
         # shape (N, E) -> (N, H)
-        self.contextLinear = nn.Linear(input_size, hidden_size, device)
+        self.contextLinear = nn.Linear(input_size, hidden_size, device=device)
         
         # Create the LSTM. The LSTM takes
         # as input a tensor of shape (N, S, V)

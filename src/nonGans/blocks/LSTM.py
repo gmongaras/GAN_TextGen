@@ -129,12 +129,12 @@ class LSTM_Module(nn.Module):
         if hidden == None:
             h_t = [torch.zeros(N, self.H, device=self.device) for i in range(self.layers)]
         else:
-            h_t = hidden
+            h_t = hidden.contiguous()
             assert hidden.shape == (self.layers, N, self.H), "Hidden state must be of shape (layers, N, H)"
         if context == None:
             c_t = [torch.zeros(N, self.H, device=self.device) for i in range(self.layers)]
         else:
-            c_t = context
+            c_t = context.contiguous()
             assert context.shape == (self.layers, N, self.H), "Context must be of shape (layers, N, H)"
         
         # The output will be of shape (N, S, H), but to make it easier,

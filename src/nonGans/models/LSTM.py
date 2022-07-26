@@ -35,7 +35,7 @@ class LSTM(nn.Module):
     #   S dimension is the output vector of the next item
     #   in the sequence.
     def forward(self, x, context=None, hidden=None):
-        return self.linear(self.LSTM(x, context))
+        return self.linear(self.LSTM(x, context, hidden))
 
 
 
