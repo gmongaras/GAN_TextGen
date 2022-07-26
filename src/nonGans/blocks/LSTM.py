@@ -111,10 +111,14 @@ class LSTM_Module(nn.Module):
     # word at each timestep
     # Inputs:
     #   x - The input sequence to get outputs for of shape (N, S, E)
+    #   context - Optional context which will be the initial context
+    #             in the first LSTM block. Shape (L, N, H)
+    #   hidden - Optional hidden state which will be the initial hidden
+    #             state in the first LSTM block. Shape (layers, N, H)
     # Outputs:
     #   Tensor of shape (N, S, H) where each part of the sequence if the
     #   predicted output for the next part of the sequence
-    def forward(self, x):
+    def forward(self, x, context=None, hidden=None):
         # Make sure the input is 3 dimensions
         assert len(x.shape) == 3, "Input should have 3 dimensions: (batch size (N), sequence length (S), embedding size (E))"
         
@@ -122,8 +126,16 @@ class LSTM_Module(nn.Module):
         N = x.shape[0]
         
         # Initialize the hidden and context matricies to zeros
-        h_t = [torch.zeros(N, self.H, device=self.device) for i in range(self.layers)]
-        c_t = [torch.zeros(N, self.H, device=self.device) for i in range(self.layers)]
+        if hidden == None:
+            h_t = [torch.zeros(N, self.H, device=self.device) for i in range(self.layers)]
+        else:
+            h_t = hidden
+            assert hidden.shape == (self.layers, N, self.H), "Hidden state must be of shape (layers, N, H)"
+        if context == None:
+            c_t = [torch.zeros(N, self.H, device=self.device) for i in range(self.layers)]
+        else:
+            c_t = context
+            assert context.shape == (self.layers, N, self.H), "Context must be of shape (layers, N, H)"
         
         # The output will be of shape (N, S, H), but to make it easier,
         # it will start as (S, N, H)

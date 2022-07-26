@@ -21,7 +21,7 @@ class Transformer(nn.Module):
         self.Transformer = Transformer_Module(layers, E, num_heads, Linear_embedding, device)
         
         # Output Linear layer
-        self.linear = nn.Linear(E, vocab_size)
+        self.linear = nn.Linear(E, vocab_size, device=device)
     
     # Forward method to get outputs from
     # a sequence of inputs. Note, these are not

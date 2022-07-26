@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from .Model import Model
+from .BothModel import Both
 from ..helpers.helpers import loadVocab
 from .helpers.load_chars import load_chars
 from .helpers.load_words import load_words
@@ -37,7 +38,7 @@ def main():
     
     
     # Model parameters
-    modelType = "rnn"           # Model type to use ("rnn", "transformer", or "both")
+    modelType = "both"           # Model type to use ("rnn", "transformer", or "both")
     outputType = "char"         # What should the model output? ("word" or "char") (Note: This is not used if modelType is "both")
     epochs = 20000              # Number of epochs to train the model for
     batchSize = 128             # Batch size used when training the model
@@ -53,12 +54,13 @@ def main():
     num_heads = 1               # Number of heads for each MHA block
     
     # Both model parameters (if used)
-    #word_length = 15            # Max length of each word
+    T = 4                       # Number of transformer layers in this model
+    L = 4                       # Number of LSTM layers in this model
+    word_length = 20            # Max length of each word
     
     # Word or Character parameters
-    seqLength = 300             # Length of the sequence to train the model on (number of words or characters)
-    input_size = 1              # (E) The embedding size of the input for each char or word
-                                # Note: If the "both" model is used, this is treated as the word length
+    seqLength = 64              # Length of the sequence to train the model on (number of words or characters)
+    input_size = 30             # (E) The embedding size of the input for each char or word
     lower = False               # True to lowercase chars/words when embedding. False otherwise
     
     # Words parameters (if used)
@@ -77,8 +79,8 @@ def main():
     
     # Load in the data
     if modelType == "both":
-        X, y = load_both(input_file, seqLength, vocab_inv, input_size, lower)
-    if outputType == "word":
+        y = load_both(input_file, seqLength, vocab_inv, word_length, lower, limit)
+    elif outputType == "word":
         X, y = load_words(input_file, seqLength, vocab_inv, input_size, lower, limit)
     else:
         X, y = load_chars(input_file, seqLength, vocab_inv, lower)
@@ -87,8 +89,10 @@ def main():
     
     ### Create the model ###
     if modelType.lower() == "both":
-        model = BothModel()
-    if modelType.lower() == "transformer":
+        model = Both(input_size, vocab_inv, dropout, device, 
+                     saveDir, saveFile, num_heads, hidden_size,
+                     T, L, word_length)
+    elif modelType.lower() == "transformer":
         model = Model(modelType, outputType, input_size,
                       len(vocab), layers, dropout, device, saveDir, saveFile,
                       num_heads=num_heads)
@@ -103,7 +107,10 @@ def main():
     
     ### Train the model ###
     
-    model.trainModel(X, y, epochs, batchSize, saveSteps)
+    if modelType.lower() == "both":
+        model.trainModel(y, epochs, batchSize, saveSteps)
+    else:
+        model.trainModel(X, y, epochs, batchSize, saveSteps)
     
     
 
