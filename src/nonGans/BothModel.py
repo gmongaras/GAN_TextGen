@@ -101,6 +101,8 @@ class Both(nn.Module):
         
         # Create batch data
         y_batches = torch.split(y, batchSize)
+        N = y.shape[0]
+        S = y.shape[1]
         del y
 
 
@@ -122,10 +124,10 @@ class Both(nn.Module):
                 
                 # The inputs into the model. Initialize it
                 # as all start words
-                inputs = self.model.CharToWord_linear2(torch.tensor([self.vocab["¶"]] + [self.vocab["↔"] for i in range(0, self.W-1)], dtype=torch.float32, device=self.device if self.dev != "partgpu" else gpu).unsqueeze(0).unsqueeze(0).expand(y.shape[0], -1, -1))
+                inputs = self.model.CharToWord_linear2(torch.tensor([self.vocab["¶"]] + [self.vocab["↔"] for i in range(0, self.W-1)], dtype=torch.float32, device=(self.device if self.dev != "partgpu" else gpu)).unsqueeze(0).unsqueeze(0).expand(N, -1, -1))
                     
                 # Iterate over each part of the sequence
-                for S in range(1, y.shape[1]+1):
+                for S in range(1, S+1):
                     # Get the predictions up to this point
                     pred = self.forward(inputs)
                     
