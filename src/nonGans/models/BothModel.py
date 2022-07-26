@@ -46,8 +46,8 @@ class BothModel(nn.Module):
         # Create the encoder to transform a matrix of shape:
         # (N, S, W, V) -> (N, S, E). This encoder transforms
         # word probabilities to encoded forms of each word.
-        self.CharToWord_linear1 = nn.Linear(self.V, 1)
-        self.CharToWord_linear2 = nn.Linear(W, input_size)
+        self.CharToWord_linear1 = nn.Linear(self.V, 1, device=device)
+        self.CharToWord_linear2 = nn.Linear(W, input_size, device=device)
     
     
     
@@ -76,7 +76,7 @@ class BothModel(nn.Module):
         # Initialize the input into the LSTM as start tokens
         # The input will be of shape (N, 1, E)
         # and will expand to shape (N, S, E)
-        x = torch.nn.functional.one_hot(torch.tensor([self.vocab["¶"]], dtype=torch.long), num_classes=self.V).float().unsqueeze(0).expand(N, -1, -1)
+        x = torch.nn.functional.one_hot(torch.tensor([self.vocab["¶"]], dtype=torch.long), num_classes=self.V).float().unsqueeze(0).expand(N, -1, -1).to(context.device)
         
         # Get a new word from teh LSTM
         for w in range(0, self.W):
