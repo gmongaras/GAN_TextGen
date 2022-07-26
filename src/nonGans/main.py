@@ -64,7 +64,7 @@ def main():
     lower = False               # True to lowercase chars/words when embedding. False otherwise
     
     # Words parameters (if used)
-    limit = 10                  # Limit on the number of sentences to load in
+    limit = 100000              # Limit on the number of sentences to load in
     
     # Character parameters (if used)
     #
@@ -111,6 +111,47 @@ def main():
         model.trainModel(y, epochs, batchSize, saveSteps)
     else:
         model.trainModel(X, y, epochs, batchSize, saveSteps)
+        
+        
+        
+    ### Get predictions from the model ###
+    # With the model trained, now let's get some predictions
+    model.eval()
+    #model.loadModel(loadDir, loadFile,)
+    sentence_size = 300
+
+    # Get a random letter to start the sequence with
+    # seed = torch.randint(0, n_vocab, (1, 1, 1), device=device)
+    # input = (seed/n_vocab).float()
+    seed = vocab[np.random.randint(0, len(vocab))]
+    input = []
+    for i in seed:
+        input.append(torch.tensor(vocab_inv[i], dtype=torch.float32, device=device))
+    input = torch.stack(input).unsqueeze(dim=-1).unsqueeze(dim=0)
+
+    # The predicted sentence
+    out_chars = [i for i in seed]
+
+    # Get 'sentence_size' number of characters
+    for s in range(0, sentence_size):
+        # Generate a new prediction from the model
+        probs = torch.nn.Softmax(-1)(model(input)[:, -1, :]).squeeze()
+
+        # Get the highest prediction from the model
+        pred = torch.argmax(probs, dim=-1)
+
+        # Sample from the softmax distribution
+        #obj_list = list(range(n_vocab))
+        #pred = torch.tensor(np.random.choice(obj_list, p=probs.detach().cpu().numpy()), device=device)
+
+        # Save the output
+        out_chars.append(vocab[pred.cpu().item()])
+
+        # Add the new prediction to the input
+        input = torch.cat((input.float(), (pred).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)), dim=1)
+
+    # Display the output
+    print("".join(out_chars))
     
     
 

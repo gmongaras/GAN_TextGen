@@ -58,7 +58,10 @@ class Both(nn.Module):
         self.W = W
         
         # Create the model
-        self.model = BothModel(input_size, vocab, dropout, device, saveDir, saveFile, num_heads, hidden_size, T, L, W)
+        if dev == "partgpu":
+            self.model = BothModel(input_size, vocab, dropout, gpu, saveDir, saveFile, num_heads, hidden_size, T, L, W)
+        else:
+            self.model = BothModel(input_size, vocab, dropout, device, saveDir, saveFile, num_heads, hidden_size, T, L, W)
         
         # Optimizer
         self.optim = torch.optim.Adam(self.parameters())
@@ -98,6 +101,7 @@ class Both(nn.Module):
         
         # Create batch data
         y_batches = torch.split(y, batchSize)
+        del y
 
 
         # Train the model
@@ -118,7 +122,7 @@ class Both(nn.Module):
                 
                 # The inputs into the model. Initialize it
                 # as all start words
-                inputs = self.model.CharToWord_linear2(torch.tensor([self.vocab["¶"]] + [self.vocab["↔"] for i in range(0, self.W-1)], dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0).expand(y.shape[0], -1, -1))
+                inputs = self.model.CharToWord_linear2(torch.tensor([self.vocab["¶"]] + [self.vocab["↔"] for i in range(0, self.W-1)], dtype=torch.float32, device=self.device if self.dev != "partgpu" else gpu).unsqueeze(0).unsqueeze(0).expand(y.shape[0], -1, -1))
                     
                 # Iterate over each part of the sequence
                 for S in range(1, y.shape[1]+1):
