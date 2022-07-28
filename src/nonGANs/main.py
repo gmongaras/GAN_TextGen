@@ -124,6 +124,8 @@ def main():
     # seed = torch.randint(0, n_vocab, (1, 1, 1), device=device)
     # input = (seed/n_vocab).float()
     seed = vocab[np.random.randint(0, len(vocab))]
+    seed = np.random.choice(['a','b','c','d','e','f','g','h','i','j','k',
+        'l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'])
     input = []
     for i in seed:
         input.append(torch.tensor(vocab_inv[i], dtype=torch.float32, device=device))
@@ -133,16 +135,25 @@ def main():
     out_chars = [i for i in seed]
 
     # Get 'sentence_size' number of characters
+    context = None
     for s in range(0, sentence_size):
         # Generate a new prediction from the model
+        if context != None:
+            out, context = model.model(input[:, -1, :], context[1], context[0], True)
+        else:
+            out, context = model.model(input[:, -1, :], retain_output=True)
         probs = torch.nn.Softmax(-1)(model(input)[:, -1, :]).squeeze()
 
         # Get the highest prediction from the model
         pred = torch.argmax(probs, dim=-1)
 
         # Sample from the softmax distribution
-        #obj_list = list(range(n_vocab))
-        #pred = torch.tensor(np.random.choice(obj_list, p=probs.detach().cpu().numpy()), device=device)
+        obj_list = list(range(len(vocab)))
+        pred = torch.tensor(np.random.choice(obj_list, p=probs.detach().cpu().numpy()), device=device)
+        
+        # Early stop
+        if pred.cpu().item() == vocab_inv["∅"]:
+            break
 
         # Save the output
         out_chars.append(vocab[pred.cpu().item()])

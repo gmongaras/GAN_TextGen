@@ -75,6 +75,9 @@ class LSTM_torch(nn.Module):
     #   in the sequence.
     def forward(self, x, context=None, hidden=None, retain_output=False):
         if retain_output:
-            o = self.LSTM(x, (hidden, context))
+            if context != None:
+                o = self.LSTM(x, (hidden.contiguous(), context.contiguous()))
+            else:
+                o = self.LSTM(x)
             return self.linear(o[0]), o[1]
         return self.linear(self.LSTM(x)[0])
