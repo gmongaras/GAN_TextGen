@@ -114,55 +114,55 @@ def main():
         
         
         
-    ### Get predictions from the model ###
-    # With the model trained, now let's get some predictions
-    model.eval()
-    #model.loadModel(loadDir, loadFile,)
-    sentence_size = 300
+    # ### Get predictions from the model ###
+    # # With the model trained, now let's get some predictions
+    # model.eval()
+    # #model.loadModel(loadDir, loadFile,)
+    # sentence_size = 300
 
-    # Get a random letter to start the sequence with
-    # seed = torch.randint(0, n_vocab, (1, 1, 1), device=device)
-    # input = (seed/n_vocab).float()
-    seed = vocab[np.random.randint(0, len(vocab))]
-    seed = np.random.choice(['a','b','c','d','e','f','g','h','i','j','k',
-        'l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'])
-    input = []
-    for i in seed:
-        input.append(torch.tensor(vocab_inv[i], dtype=torch.float32, device=device))
-    input = torch.stack(input).unsqueeze(dim=-1).unsqueeze(dim=0)
+    # # Get a random letter to start the sequence with
+    # # seed = torch.randint(0, n_vocab, (1, 1, 1), device=device)
+    # # input = (seed/n_vocab).float()
+    # seed = vocab[np.random.randint(0, len(vocab))]
+    # seed = np.random.choice(['a','b','c','d','e','f','g','h','i','j','k',
+    #     'l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'])
+    # input = []
+    # for i in seed:
+    #     input.append(torch.tensor(vocab_inv[i], dtype=torch.float32, device=device))
+    # input = torch.stack(input).unsqueeze(dim=-1).unsqueeze(dim=0)
 
-    # The predicted sentence
-    out_chars = [i for i in seed]
+    # # The predicted sentence
+    # out_chars = [i for i in seed]
 
-    # Get 'sentence_size' number of characters
-    context = None
-    for s in range(0, sentence_size):
-        # Generate a new prediction from the model
-        if context != None:
-            out, context = model.model(input[:, -1, :], context[1], context[0], True)
-        else:
-            out, context = model.model(input[:, -1, :], retain_output=True)
-        probs = torch.nn.Softmax(-1)(model(input)[:, -1, :]).squeeze()
+    # # Get 'sentence_size' number of characters
+    # context = None
+    # for s in range(0, sentence_size):
+    #     # Generate a new prediction from the model
+    #     if context != None:
+    #         out, context = model.model(input[:, -1, :], context[1], context[0], True)
+    #     else:
+    #         out, context = model.model(input[:, -1, :], retain_output=True)
+    #     probs = torch.nn.Softmax(-1)(model(input)[:, -1, :]).squeeze()
 
-        # Get the highest prediction from the model
-        pred = torch.argmax(probs, dim=-1)
+    #     # Get the highest prediction from the model
+    #     pred = torch.argmax(probs, dim=-1)
 
-        # Sample from the softmax distribution
-        obj_list = list(range(len(vocab)))
-        pred = torch.tensor(np.random.choice(obj_list, p=probs.detach().cpu().numpy()), device=device)
+    #     # Sample from the softmax distribution
+    #     obj_list = list(range(len(vocab)))
+    #     pred = torch.tensor(np.random.choice(obj_list, p=probs.detach().cpu().numpy()), device=device)
         
-        # Early stop
-        if pred.cpu().item() == vocab_inv["∅"]:
-            break
+    #     # Early stop
+    #     if pred.cpu().item() == vocab_inv["∅"]:
+    #         break
 
-        # Save the output
-        out_chars.append(vocab[pred.cpu().item()])
+    #     # Save the output
+    #     out_chars.append(vocab[pred.cpu().item()])
 
-        # Add the new prediction to the input
-        input = torch.cat((input.float(), (pred).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)), dim=1)
+    #     # Add the new prediction to the input
+    #     input = torch.cat((input.float(), (pred).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)), dim=1)
 
-    # Display the output
-    print("".join(out_chars))
+    # # Display the output
+    # print("".join(out_chars))
     
     
 
