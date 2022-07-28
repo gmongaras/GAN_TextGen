@@ -60,6 +60,7 @@ def main():
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
     num_heads = 8            # Number of heads in each MHA block
+    secondLoss = True        # True to use a second loss function, False otherwise
     
     # Training parameters
     trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
@@ -108,7 +109,7 @@ def main():
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
-                sequence_length, num_heads,
+                sequence_length, num_heads, secondLoss,
                 trainingRatio, decRatRate, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,

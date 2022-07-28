@@ -8,10 +8,10 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            //"module": "src.GANs.main",
-		"module": "src.nonGANs.main",
-		//"module": "src.helpers.generate_chars",
-		//"module": "src.helpers.generate_words",
+            "module": "src.GANs.main",
+		    //"module": "src.nonGANs.main",
+		    //"module": "src.helpers.generate_chars",
+		    //"module": "src.helpers.generate_words",
             "console": "integratedTerminal",
             "justMyCode": false
         }
