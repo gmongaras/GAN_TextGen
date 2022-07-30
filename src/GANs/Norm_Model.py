@@ -5,6 +5,7 @@ from ..helpers.helpers import addPadding_one_hot
 
 
 from .models.losses import binary_cross_entropy_loss
+from .models.losses import categorical_cross_entropy_loss
 
 
 from .models.Generator import Generator
@@ -180,7 +181,7 @@ class Norm_Model(nn.Module):
                 Y = Y.to(self.device)
             
             # Get the loss
-            loss = binary_cross_entropy_loss(Y_fake, Y)
+            loss = categorical_cross_entropy_loss(Y_fake, Y)
             
             # Backpropogate the loss
             loss.backward()

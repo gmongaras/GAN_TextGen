@@ -29,7 +29,7 @@ def main():
     
     ### Load in the data ###
     sentences = []
-    max = 100000   # Max number of sentences to load in
+    max = 1000   # Max number of sentences to load in
     i = 0
     with open(input_file, "r", encoding='windows-1252') as file:
         for line in file:
@@ -46,21 +46,22 @@ def main():
     ### Create the model ###
     
     # Model paramters
-    M_gen = 6                # Number of noise encoding blocks in the generator
-    B_gen = 6                # Number of generator blocks in the generator
+    M_gen = 2                # Number of noise encoding blocks in the generator
+    B_gen = 2                # Number of generator blocks in the generator
     O_gen = 2                # Number of MHA blocks in the generator
     gausNoise = True         # True to add pure gaussian noise in the generator output
                              # encoding, False to not add this noise
-    T_disc = 6               # Number of transformer blocks in each discriminator block
-    B_disc = 4               # Number of discriminator blocks in the discriminator
+    T_disc = 2               # Number of transformer blocks in each discriminator block
+    B_disc = 2               # Number of discriminator blocks in the discriminator
     O_disc = 2               # Number of output MHA blocks in the discrimiantor
     batchSize = 64           # Batch size for the entire model
     embedding_size_gen = 64  # Embedding size of the generator
     embedding_size_disc = 64 # Embedding size of the discriminator
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
-    num_heads = 8            # Number of heads in each MHA block
-    secondLoss = True        # True to use a second loss function, False otherwise
+    num_heads = 2            # Number of heads in each MHA block
+    dynamic_n_G = True       # True to dynamically change the number of times to train
+                             # the generator. False otherwise
     
     # Training parameters
     trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
@@ -109,7 +110,7 @@ def main():
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
-                sequence_length, num_heads, secondLoss,
+                sequence_length, num_heads, dynamic_n_G,
                 trainingRatio, decRatRate, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,

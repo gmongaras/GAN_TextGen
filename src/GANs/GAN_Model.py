@@ -55,7 +55,8 @@ class GAN_Model(nn.Module):
     #   embedding_size_disc - Embedding size of the discriminator
     #   sequence_length - The max length of the sentence to train the model on
     #   num_heads - Number of heads for the MHA modules
-    #   secondLoss - True to use a second loss function, False otherwise
+    #   dynamic_n_G - True to dynamically change the number of times to train
+    #                 the generator. False otherwise
     #   trainingRatio - 2-D array representing the number of epochs to 
     #                   train the generator (0) vs the discriminator (1)
     #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
@@ -80,7 +81,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, secondLoss, trainingRatio, decRatRate, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, trainingRatio, decRatRate, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # The ratio must not have a lower value for the discriminator (1)
@@ -95,7 +96,7 @@ class GAN_Model(nn.Module):
         self.decRatRate = decRatRate
         self.Lambda = Lambda
         self.loadInEpoch = loadInEpoch
-        self.secondLoss = secondLoss
+        self.dynamic_n_G = dynamic_n_G
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
         # Saving paramters
@@ -291,9 +292,16 @@ class GAN_Model(nn.Module):
                 # Delete all discriminator stuff as its no longer needed
                 del disc_sub, disc_fake, real_X, gradient_penalty, disc_real
             
+            # Using the current loss values, calculate a new n_G, the
+            # number of times to train the generator
+            if len(self.genLoss) >= 2 and self.dynamic_n_G == True:
+                n_G = np.ceil(np.exp(2*(self.genLoss[-1]-self.genLoss[-2]))).astype(np.int)
+            else:
+                n_G = 1
+            
             # Train the generator next
             self.optim_gen.zero_grad()
-            for i in range(0, max(self.trainingRatio[0], 1)):
+            for i in range(0, max(n_G, 1)):
                 # Sample real data for the second loss function
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
@@ -316,46 +324,6 @@ class GAN_Model(nn.Module):
                 # Get the generator loss
                 #genLoss = minimax_gen(disc_fake)
                 genLoss = wasserstein_gen(disc_fake)
-                
-                # If extra loss is used, handle the additional loss
-                if self.secondLoss == True:
-                    # Get a real data subset using one_hot encoding
-                    if self.loadInEpoch == True:
-                        # Load in more data until no more data is availble
-                        # or the requested batch size is obtained
-                        real_Y = np.array([])
-                        while real_Y.shape[0] < self.batchSize or disc_nums.shape[0] == 0:
-                            # Get more data if needed
-                            disc_sub = disc_nums[:self.batchSize]
-                            disc_nums = disc_nums[self.batchSize:]
-                            
-                            # Save the data
-                            if len(real_Y) == 0:
-                                real_Y = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
-                            else:
-                                real_Y = np.concatenate((real_Y, np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)[:self.batchSize-real_Y.shape[0]]))
-                        
-                        # If disc_nums is empty, a problem occured
-                        assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
-                    else:
-                        real_Y = X_orig_one_hot[disc_sub.cpu().numpy()]
-                    
-                    # Add padding to the subset
-                    real_Y = addPadding_one_hot(real_Y, self.vocab_inv, self.sequence_length)
-                    if self.dev == "partgpu":
-                        real_Y = real_Y.to(gpu)
-                    else:
-                        real_Y = real_Y.to(self.device)
-                        
-                    
-                    # Add on the second loss term
-                    genLoss_extra = categorical_cross_entropy_loss(Y, real_Y)
-                    
-                    # Combine the losses
-                    #Lambda = torch.clamp(1/torch.abs(discLoss), 0, 1).detach()
-                    #genLoss = Lambda*genLoss + (1-Lambda)*genLoss_extra
-                    Lambda = torch.clamp(torch.abs(discLoss), 0, torch.inf).detach()
-                    genLoss = genLoss + Lambda*genLoss_extra
 
                 
                 # Backpropogate the loss
@@ -366,7 +334,7 @@ class GAN_Model(nn.Module):
                 self.optim_gen.zero_grad()
             
                 # Delete all generator stuff as its no longer needed
-                del disc_sub, disc_nums, disc_fake, Y
+                del disc_sub, disc_fake, Y
             
             
             # Decrease the rate
