@@ -114,7 +114,7 @@ def main():
         
         
         
-    # ### Get predictions from the model ###
+    # ### Get char predictions from the model ###
     # # With the model trained, now let's get some predictions
     # model.eval()
     # #model.loadModel(loadDir, loadFile,)
@@ -160,6 +160,68 @@ def main():
 
     #     # Add the new prediction to the input
     #     input = torch.cat((input.float(), (pred).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)), dim=1)
+
+    # # Display the output
+    # print("".join(out_chars))
+    
+    
+    
+    
+    
+    
+    
+    # ### Get word predictions from the model ###
+    # # With the model trained, now let's get some predictions
+    # model.eval()
+    # device = torch.device("cpu")
+    # model.loadModel("models", "model - 2900.pkl")
+    # model = model.to(device)
+    # sentence_size = 64
+
+    # # Get a random letter to start the sequence with
+    # # seed = torch.randint(0, n_vocab, (1, 1, 1), device=device)
+    # # input = (seed/n_vocab).float()
+    # seed = vocab[np.random.randint(0, len(vocab))]
+    # #seed = np.random.choice(['a','b','c','d','e','f','g','h','i','j','k',
+    # #    'l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'])
+    # input = []
+    # seed = ["<START>"]
+    # for i in seed:
+    #     input.append(torch.tensor(vocab_inv[i], dtype=torch.float32, device=device))
+    # input[0] = torch.nn.Embedding(len(vocab.keys()), input_size)(input[0].long())
+    # input = torch.stack(input).unsqueeze(dim=0)
+    # print(input.shape)
+
+    # # The predicted sentence
+    # out_chars = [i for i in seed]
+
+    # # Get 'sentence_size' number of characters
+    # context = None
+    # for s in range(0, sentence_size):
+    #     # Generate a new prediction from the model
+    #     if context != None:
+    #         out, context = model.model(input[:, -1, :], context[1], context[0], True)
+    #     else:
+    #         out, context = model.model(input[:, -1, :], retain_output=True)
+    #     probs = torch.nn.Softmax(-1)(model(input)[:, -1, :]).squeeze()
+
+    #     # Get the highest prediction from the model
+    #     pred = torch.argmax(probs, dim=-1)
+
+    #     # Sample from the softmax distribution
+    #     obj_list = list(range(len(vocab)))
+    #     pred = torch.tensor(np.random.choice(obj_list, p=probs.detach().cpu().numpy()), device=device)
+        
+    #     # Early stop
+    #     if pred.cpu().item() == vocab_inv["<END>"]:
+    #         break
+
+    #     # Save the output
+    #     out_chars.append(vocab[pred.cpu().item()] + " ")
+    #     pred = torch.nn.Embedding(len(vocab.keys()), input_size)(pred.long())
+
+    #     # Add the new prediction to the input
+    #     input = torch.cat((input.float(), (pred).unsqueeze(0).unsqueeze(0)), dim=1)
 
     # # Display the output
     # print("".join(out_chars))

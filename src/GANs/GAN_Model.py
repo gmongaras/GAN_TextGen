@@ -352,8 +352,11 @@ class GAN_Model(nn.Module):
                     genLoss_extra = categorical_cross_entropy_loss(Y, real_Y)
                     
                     # Combine the losses
-                    Lambda = torch.clamp(1/torch.abs(discLoss), 0, 1).detach()
-                    genLoss = Lambda*genLoss + (1-Lambda)*genLoss_extra
+                    #Lambda = torch.clamp(1/torch.abs(discLoss), 0, 1).detach()
+                    #genLoss = Lambda*genLoss + (1-Lambda)*genLoss_extra
+                    Lambda = torch.clamp(torch.abs(discLoss), 0, torch.inf).detach()
+                    genLoss = genLoss + Lambda*genLoss_extra
+
                 
                 # Backpropogate the loss
                 genLoss.backward()
@@ -374,11 +377,11 @@ class GAN_Model(nn.Module):
                 
             # Save the loss values
             self.genLoss.append(genLoss.item())
-            self.discLoss.append(discCost.item())
+            self.discLoss.append(discLoss.item())
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discCost.item(), 4)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
     
     
     

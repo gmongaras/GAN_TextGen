@@ -15,13 +15,13 @@ def main():
     vocab_file = "vocab_fortunes.csv"
     
     # Saving/Loading paramters
-    saveDir = "models-gumb"
+    saveDir = "models"
     genSaveFile = "gen_model.pkl"
     discSaveFile = "disc_model.pkl"
     trainGraphFile = "trainGraph.png"
     TgraphFile = "TGraph.png" # Only used for diffusion GAN
     
-    loadDir = "models-gumb"
+    loadDir = "models"
     genLoadFile = "gen_model.pkl"
     discLoadFile = "disc_model.pkl"
     
