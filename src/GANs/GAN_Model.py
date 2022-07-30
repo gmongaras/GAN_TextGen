@@ -277,7 +277,7 @@ class GAN_Model(nn.Module):
                 #discLoss = minimax_disc(disc_real, disc_fake)
                 discLoss = wasserstein_disc(disc_real, disc_fake)
                 
-                discLoss_real, discLoss_fake = wasserstein_disc_split(disc_real, disc_fake)
+                discLoss_fake, discLoss_real = wasserstein_disc_split(disc_real, disc_fake)
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -349,7 +349,7 @@ class GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {-round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
     
     
     
