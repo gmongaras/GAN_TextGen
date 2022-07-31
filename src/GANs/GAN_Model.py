@@ -57,10 +57,7 @@ class GAN_Model(nn.Module):
     #   num_heads - Number of heads for the MHA modules
     #   dynamic_n_G - True to dynamically change the number of times to train
     #                 the generator. False otherwise
-    #   trainingRatio - 2-D array representing the number of epochs to 
-    #                   train the generator (0) vs the discriminator (1)
-    #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
-    #                never decrease the ratio
+    #   n_D - Number of times to train the discriminator more than the generator for each epoch
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   gen_outEnc_mode - How should the generator encode its output? ("norm" or "gumb")
     #   embed_mode_gen - What embedding mode should be used for the
@@ -81,19 +78,15 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, trainingRatio, decRatRate, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
-        
-        # The ratio must not have a lower value for the discriminator (1)
-        assert trainingRatio[0]<=trainingRatio[1], "The training ratio must have a grater number in the zeroth index"
         
         # Save the needed variables
         self.vocab = vocab
         self.vocab_inv = {vocab[i]:i for i in vocab.keys()}
         self.sequence_length = sequence_length
         self.batchSize = batchSize
-        self.trainingRatio = trainingRatio
-        self.decRatRate = decRatRate
+        self.n_D = n_D
         self.Lambda = Lambda
         self.loadInEpoch = loadInEpoch
         self.dynamic_n_G = dynamic_n_G
@@ -214,7 +207,7 @@ class GAN_Model(nn.Module):
             
             # Train the discriminator first
             self.optim_disc.zero_grad()
-            for i in range(0, max(self.trainingRatio[1], 1)):
+            for i in range(0, max(self.n_D, 1)):
                 # Sample data for the discriminator
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
@@ -296,6 +289,7 @@ class GAN_Model(nn.Module):
             # number of times to train the generator
             if len(self.genLoss) >= 2 and self.dynamic_n_G == True:
                 n_G = np.ceil(np.exp(2*(self.genLoss[-1]-self.genLoss[-2]))).astype(np.int)
+                n_G = np.min([n_G, self.n_D]) # Limit the value to the number of times the discriminator is trained
             else:
                 n_G = 1
             
@@ -337,19 +331,16 @@ class GAN_Model(nn.Module):
                 del disc_sub, disc_fake, Y
             
             
-            # Decrease the rate
-            if self.decRatRate > 0:
-                if epochs%self.decRatRate == 0 and self.decRatRate > 0:
-                    self.trainingRatio[0] -= 1
-                    self.trainingRatio[1] -= 1
-                
             # Save the loss values
             self.genLoss.append(genLoss.item())
             self.discLoss.append(discLoss.item())
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {-round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}\n")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {-round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}", end="")
+            if self.dynamic_n_G == True:
+                print(f"    n_G: {n_G}", end="")
+            print()
     
     
     

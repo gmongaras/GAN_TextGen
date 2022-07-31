@@ -60,10 +60,7 @@ class Diff_GAN_Model(nn.Module):
     #   embedding_size_disc - Embedding size of the discriminator
     #   sequence_length - The max length of the sentence to train the model on
     #   num_heads - Number of heads for the MHA modules
-    #   trainingRatio - 2-D array representing the number of epochs to 
-    #                   train the generator (0) vs the discriminator (1)
-    #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
-    #                never decrease the ratio
+    #   n_D - Number of times to train the discriminator more than the generator for each epoch
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   gen_outEnc_mode - How should the generator encode its output? ("norm" or "gumb")
     #   embed_mode_gen - What embedding mode should be used for the
@@ -94,19 +91,15 @@ class Diff_GAN_Model(nn.Module):
     #               T change should be positive of negative depending 
     #               on the disc output
     #   C - Constant for the T scheduler multiplying the change of T
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, trainingRatio, decRatRate, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
         super(Diff_GAN_Model, self).__init__()
-        
-        # The ratio must not have a lower value for the discriminator (1)
-        assert trainingRatio[0]<=trainingRatio[1], "The training ratio must have a grater number in the zeroth index"
         
         # Save the needed variables
         self.vocab = vocab
         self.vocab_inv = {vocab[i]:i for i in vocab.keys()}
         self.sequence_length = sequence_length
         self.batchSize = batchSize
-        self.trainingRatio = trainingRatio
-        self.decRatRate = decRatRate
+        self.n_D = n_D
         self.Lambda = Lambda
         self.loadInEpoch = loadInEpoch
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
@@ -218,7 +211,7 @@ class Diff_GAN_Model(nn.Module):
             
             # Step 1: Train the discriminator
             self.optim_disc.zero_grad()
-            for i in range(0, max(self.trainingRatio[1], 1)):
+            for i in range(0, max(self.n_D, 1)):
                 # Sample a batch of real data
                 disc_sub = disc_nums[:self.batchSize]
                 
@@ -294,7 +287,7 @@ class Diff_GAN_Model(nn.Module):
             
             # Step 2: Train the generator
             self.optim_gen.zero_grad()
-            for i in range(0, max(self.trainingRatio[0], 1)):
+            for i in range(0, 1):
                 # Get subset indices of the data for the generator
                 # and discriminator
                 disc_sub = disc_nums[:self.batchSize]
@@ -333,12 +326,6 @@ class Diff_GAN_Model(nn.Module):
             self.TVals.append(self.T)
             
             
-            # Decrease the rate
-            if self.decRatRate > 0:
-                if epochs%self.decRatRate == 0 and self.decRatRate > 0:
-                    self.trainingRatio[0] -= 1
-                    self.trainingRatio[1] -= 1
-                
             # Save the loss values
             self.genLoss.append(genLoss.item())
             self.discLoss.append(discLoss.item())

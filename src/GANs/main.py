@@ -75,8 +75,7 @@ def main():
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
     device = "cpu"              # cpu, partgpu, or fullgpu
     epochs = 300000             # Number of epoch to train the model
-    trainingRatio = [1, 6]      # Number of epochs to train the generator (0) vs the discriminator (1)
-    decRatRate = -1             # Decrease the ratio after every decRatRate steps (-1 for not decrease)
+    n_D = 6                     # Number of times to train the discriminator more than the generator for each epoch
     saveSteps = 1000            # Number of steps until the model is saved
     loadInEpoch = False         # Should the data be loaded in as needed instead of
                                 # before training (True if so, False to load before training)
@@ -99,7 +98,7 @@ def main():
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
                 sequence_length, num_heads,
-                trainingRatio, decRatRate, pooling, gen_outEnc_mode,
+                n_D, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
@@ -111,7 +110,7 @@ def main():
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
                 sequence_length, num_heads, dynamic_n_G,
-                trainingRatio, decRatRate, pooling, gen_outEnc_mode,
+                n_D, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
