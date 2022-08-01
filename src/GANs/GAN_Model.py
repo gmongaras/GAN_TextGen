@@ -57,6 +57,7 @@ class GAN_Model(nn.Module):
     #   num_heads - Number of heads for the MHA modules
     #   dynamic_n_G - True to dynamically change the number of times to train
     #                 the generator. False otherwise
+    #   Beta_n - Number of steps till Beta is recalculated for dynamic G
     #   n_D - Number of times to train the discriminator more than the generator for each epoch
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   gen_outEnc_mode - How should the generator encode its output? ("norm" or "gumb")
@@ -78,7 +79,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, Beta_n, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -90,6 +91,7 @@ class GAN_Model(nn.Module):
         self.Lambda = Lambda
         self.loadInEpoch = loadInEpoch
         self.dynamic_n_G = dynamic_n_G
+        self.Beta_n = Beta_n
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
         # Saving paramters
@@ -98,6 +100,9 @@ class GAN_Model(nn.Module):
         self.genSaveFile = genSaveFile
         self.discSaveFile = discSaveFile
         self.trainGraphFile = trainGraphFile
+        
+        # Parameter for changing n_G
+        self.Beta = 1 # Starting Beta value
 
         # Convert the device to a torch device
         if device.lower() == "fullgpu":
@@ -287,8 +292,8 @@ class GAN_Model(nn.Module):
             
             # Using the current loss values, calculate a new n_G, the
             # number of times to train the generator
-            if len(self.genLoss) >= 2 and self.dynamic_n_G == True:
-                n_G = np.ceil(np.exp(2*(self.genLoss[-1]-self.genLoss[-2]))).astype(np.int)
+            if len(self.discLoss) >= 1 and self.dynamic_n_G == True:
+                n_G = np.ceil(self.Beta*np.exp((np.abs(discLoss.detach().cpu().numpy())-np.abs(self.discLoss[-1])))).astype(np.int)
                 n_G = np.min([n_G, self.n_D]) # Limit the value to the number of times the discriminator is trained
             else:
                 n_G = 1
@@ -337,9 +342,14 @@ class GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
+            # Beta changing for n_G
+            if epoch % self.Beta_n == 0:
+                self.Beta = self.Beta + np.tanh((np.abs(self.discLoss[-1])-np.abs(self.discLoss[-self.Beta_n]))/self.Beta_n)
+                print(self.Beta)
+            
             print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {-round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}", end="")
             if self.dynamic_n_G == True:
-                print(f"    n_G: {n_G}", end="")
+                print(f"    n_G: {n_G}    Beta: {self.Beta}", end="")
             print()
     
     

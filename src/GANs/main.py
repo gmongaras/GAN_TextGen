@@ -62,6 +62,8 @@ def main():
     num_heads = 8            # Number of heads in each MHA block
     dynamic_n_G = True       # True to dynamically change the number of times to train
                              # the generator. False otherwise
+    Beta_n = 50              # Number of steps till Beta is recalculated
+                             # For dynamic G
     
     # Training parameters
     trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
@@ -109,7 +111,7 @@ def main():
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
-                sequence_length, num_heads, dynamic_n_G,
+                sequence_length, num_heads, dynamic_n_G, Beta_n,
                 n_D, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
