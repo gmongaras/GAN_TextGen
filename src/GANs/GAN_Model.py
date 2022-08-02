@@ -343,8 +343,8 @@ class GAN_Model(nn.Module):
             self.discLoss_fake.append(discLoss_fake.item())
             
             # Beta changing for n_G
-            if epoch % self.Beta_n == 0:
-                self.Beta = self.Beta + np.tanh((np.abs(self.discLoss[-1])-np.abs(self.discLoss[-self.Beta_n]))/self.Beta_n)
+            if epoch % self.Beta_n == 0 and self.dynamic_n_G == True and epoch > 100:
+                self.Beta = np.max(1, self.Beta + np.tanh((np.abs(self.discLoss[-1])-np.abs(self.discLoss[-self.Beta_n]))/self.Beta_n))
             
             print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {-round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}", end="")
             if self.dynamic_n_G == True:
