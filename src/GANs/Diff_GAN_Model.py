@@ -91,7 +91,7 @@ class Diff_GAN_Model(nn.Module):
     #               T change should be positive of negative depending 
     #               on the disc output
     #   C - Constant for the T scheduler multiplying the change of T
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
         super(Diff_GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -100,7 +100,6 @@ class Diff_GAN_Model(nn.Module):
         self.sequence_length = sequence_length
         self.batchSize = batchSize
         self.n_D = n_D
-        self.Lambda = Lambda
         self.loadInEpoch = loadInEpoch
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         

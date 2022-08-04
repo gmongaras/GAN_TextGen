@@ -22,8 +22,8 @@ def main():
     TgraphFile = "TGraph.png" # Only used for diffusion GAN
     
     loadDir = "models"
-    genLoadFile = "gen_model.pkl"
-    discLoadFile = "disc_model.pkl"
+    genLoadFile = "fort.pkl"
+    discLoadFile = "disc.pkl"
     
     
     
@@ -49,14 +49,12 @@ def main():
     M_gen = 6                # Number of noise encoding blocks in the generator
     B_gen = 6                # Number of generator blocks in the generator
     O_gen = 2                # Number of MHA blocks in the generator
-    gausNoise = True         # True to add pure gaussian noise in the generator output
-                             # encoding, False to not add this noise
+    embedding_size_gen = 64  # Embedding size of the generator
     T_disc = 6               # Number of transformer blocks in each discriminator block
     B_disc = 4               # Number of discriminator blocks in the discriminator
-    O_disc = 2               # Number of output MHA blocks in the discrimiantor
-    batchSize = 64           # Batch size for the entire model
-    embedding_size_gen = 64  # Embedding size of the generator
+    O_disc = 2               # Number of output MHA blocks for each transformer in the discrimiantor
     embedding_size_disc = 64 # Embedding size of the discriminator
+    batchSize = 64           # Batch size for the entire model
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
     num_heads = 8            # Number of heads in each MHA block
@@ -64,6 +62,8 @@ def main():
                              # the generator. False otherwise
     Beta_n = 25              # Number of steps till Beta is recalculated
                              # For dynamic G
+    gausNoise = True         # True to add pure gaussian noise in the generator output
+                             # encoding, False to not add this noise
     
     # Training parameters
     trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
@@ -76,7 +76,7 @@ def main():
     Beta2 = 0.999               # Adam beta 2 term
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
     device = "cpu"              # cpu, partgpu, or fullgpu
-    epochs = 300000             # Number of epoch to train the model
+    epochs = 300000             # Number of epochs to train the model
     n_D = 6                     # Number of times to train the discriminator more than the generator for each epoch
     saveSteps = 1000            # Number of steps until the model is saved
     loadInEpoch = False         # Should the data be loaded in as needed instead of
