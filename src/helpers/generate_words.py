@@ -10,7 +10,7 @@ def generate():
     
     
     # The created vocab as each word is seen
-    vocab = {"<START>": 0, "<PAD>": 1, "<END>": 2, "<UNKNOWN>": 3}
+    vocab = {"<START>": 0, "<PAD>": 1, "<END>": 2, "<NEXT>": 3}
     
     i = len(vocab)
     
