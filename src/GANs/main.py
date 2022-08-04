@@ -62,7 +62,7 @@ def main():
     num_heads = 8            # Number of heads in each MHA block
     dynamic_n_G = True       # True to dynamically change the number of times to train
                              # the generator. False otherwise
-    Beta_n = 50              # Number of steps till Beta is recalculated
+    Beta_n = 25              # Number of steps till Beta is recalculated
                              # For dynamic G
     
     # Training parameters
@@ -72,8 +72,8 @@ def main():
     embed_mode_gen = "norm"     # Embedding mode for the generator ("norm" or "custom")
     embed_mode_disc = "fc"      # Embedding mode for the discriminator ("fc" or "pca")
     alpha = 0.0001              # Model learning rate
-    Beta1 = 0                   # Adam beta 1 term
-    Beta2 = 0.9                 # Adam beta 2 term
+    Beta1 = 0.9                 # Adam beta 1 term
+    Beta2 = 0.999               # Adam beta 2 term
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
     device = "cpu"              # cpu, partgpu, or fullgpu
     epochs = 300000             # Number of epoch to train the model

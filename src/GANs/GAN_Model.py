@@ -336,6 +336,11 @@ class GAN_Model(nn.Module):
                 del disc_sub, disc_fake, Y
             
             
+            # Flip the maximizing values to represent the actual value
+            genLoss *= -1
+            discLoss_real *= -1
+            
+            
             # Save the loss values
             self.genLoss.append(genLoss.item())
             self.discLoss.append(discLoss.item())
@@ -346,7 +351,7 @@ class GAN_Model(nn.Module):
             if epoch % self.Beta_n == 0 and self.dynamic_n_G == True and epoch > 100:
                 self.Beta = np.max([1, self.Beta + np.tanh((np.abs(self.discLoss[-1])-np.abs(self.discLoss[-self.Beta_n]))/self.Beta_n)])
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {-round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}", end="")
             if self.dynamic_n_G == True:
                 print(f"    n_G: {n_G}    Beta: {self.Beta}", end="")
             print()
