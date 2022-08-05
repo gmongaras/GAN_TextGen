@@ -32,22 +32,19 @@ class MHA(nn.Module):
     
     
     # 2 input tensors. The first input tensor X_1 will encode the
-    # value and the query. The second tensor X-2 will encode
-    # the query.
+    # key and the query. The second tensor X-2 will encode
+    # the values.
     # Input:
     #   A 3-D tensor of shape (N, S, E_1)
     #   A 3-D tensor of shape (N, S, E_2)
+    #   Optional 3-D tensor of shape (N, S)
     # Output:
     #   A 3-D tensor of shape (N, S, output_embedding)
-    def forward(self, X_1, X_2):
+    def forward(self, X_1, X_2, masks=None):
         # Get the key, query, value embedings
-        X_2 = X_2
-        query = self.query_weights(X_2)
-        value = torch.broadcast_to(self.value_weights(X_1), query.shape)
-        key = torch.broadcast_to(self.key_weights(X_1), query.shape)
+        value = self.value_weights(X_2)
+        query = torch.broadcast_to(self.query_weights(X_1), value.shape)
+        key = torch.broadcast_to(self.key_weights(X_1), value.shape)
         
-        # Get the MHA valeu and return it
-        if self.mask:
-            return self.MultiHeadAtt(query, key, value)[0]
-        else:
-            return self.MultiHeadAtt(query, key, value)[0]
+        # Get the MHA value and return it
+        return self.MultiHeadAtt(query, key, value, attn_mask=masks, need_weights=False)[0]
