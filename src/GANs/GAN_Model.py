@@ -237,7 +237,10 @@ class GAN_Model(nn.Module):
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
+                if self.HideAfterEnd:
+                    disc_fake = torch.squeeze(self.discriminator(Y, masks))
+                else:
+                    disc_fake = torch.squeeze(self.discriminator(Y))
                 
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:

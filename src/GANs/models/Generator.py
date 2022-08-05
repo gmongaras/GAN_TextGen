@@ -198,7 +198,8 @@ class Generator(nn.Module):
         
         # The tokenzied output sentences
         t = torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)
-        out_sent = [[t] for i in range(self.batchSize)]
+        out_sent = torch.zeros((w.shape[0], w.shape[1], len(self.vocab)), requires_grad=False, dtype=torch.float32, device=self.device)
+        out_sent[:, 0] = t.broadcast_to(out_sent.shape[0], out_sent.shape[2])
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
@@ -233,8 +234,7 @@ class Generator(nn.Module):
             #    #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
             
             # Save the tokenized new word
-            for i in range(self.batchSize):
-                out_sent[i].append(out_tok[i])
+            out_sent[:, tok] = out_tok[tok]
                 
             # Encode the output token
             out_tok = torch.nn.functional.one_hot(out_tok.long(), len(self.vocab)).float()
@@ -263,7 +263,7 @@ class Generator(nn.Module):
     #   A 3-D tensor of shape (N, sequence_length, vocab_size)
     #      where the vocab_size is a softmaxed output
     #   If HideAfterEnd is True, then a masks tensor of shape
-    #      (N, sequence_length, sequence_length) is also outputted
+    #      (N, sequence_length) is also outputted
     def forward_train(self, HideAfterEnd=False):
         # Put the model in train mode
         self.train()
@@ -311,15 +311,11 @@ class Generator(nn.Module):
         t = t.float().to(self.device)
         if t.requires_grad == False:
             t.requires_grad = True
-        out_sent = torch.zeros((w.shape[0], w.shape[1], len(self.vocab)), requires_grad=False, dtype=torch.float32, device=self.device)
-        out_sent[:, 0] = t.broadcast_to(out_sent.shape[0], out_sent.shape[2])
-        
-        # Position of any <END> tokens in the outut
-        end_pos = -1*torch.ones((Y.shape[0]), requires_grad=False, device=self.device, dtype=torch.int16)
+        out_sent = [[t] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(1, self.sequence_length):
-            # Send the input through the tranformer blocks
+            # Send the input through the transformer blocks
             output = Y
             for block in self.transBlocks:
                 output = block(w[:, 0:Y.shape[1]], output)
@@ -344,13 +340,8 @@ class Generator(nn.Module):
                 out_tok_soft = torch.nn.functional.gumbel_softmax(torch.log(torch.clamp(self.gumb_linear(out_tok_b), 0.00001, torch.inf)), dim=-1)
             
             # Save the softmax output
-            out_sent[:, tok] = out_tok_soft[tok]
-            # for i in range(self.batchSize):
-            #     out_sent[i].append(out_tok_soft[i])
-                
-                # # If the output is an <END> token, save the position
-                # if torch.argmax(out_tok_soft[i]).cpu().detach().item() == self.vocab_inv["<NEXT>"]:
-                #     end_pos[i] = torch.argmax(out_tok_soft[i]).cpu().detach().item()
+            for i in range(self.batchSize):
+                out_sent[i].append(out_tok_soft[i])
             
             # Encode the output token
             out_tok = self.Word2Vec(out_tok)
@@ -366,9 +357,17 @@ class Generator(nn.Module):
                 #Y[:, tok] = out_tok + posEnc[:, tok] # Replace the <NEXT> token with the new token prediction with position encodings
                 Y = torch.cat((Y, nextTok.clone()), dim=1) # Add the <NEXT> token
                 Y[:, tok+1] += posEnc[:, tok+1] # Add positional encodings to the <NEXT> token
+                
+        
+        # Turn the output into a tensor
+        out_sent = [torch.stack(sent) for sent in out_sent]
+        out_sent = torch.stack(out_sent)
         
         
         if HideAfterEnd:
+            # Position of any <END> tokens in the outut
+            end_pos = Y.shape[1]*torch.ones((Y.shape[0]), requires_grad=False, device=self.device, dtype=torch.int16)
+            
             # Get the position of the first <END> token for each generated sequence
             out_sent[:5, 4] = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<END>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
             out_sent[:32, 8] = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<END>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
@@ -385,17 +384,15 @@ class Generator(nn.Module):
             end_pos = end_pos.long()
             
             # Generate a tensor used to mask the MHA
-            masks = torch.zeros((out_sent.shape[0], out_sent.shape[1], out_sent.shape[1]), dtype=torch.float32, requires_grad=True, device=self.device)
+            masks = torch.zeros((out_sent.shape[0], out_sent.shape[1]), dtype=torch.bool, requires_grad=False, device=self.device)
             
             # Make all parts of the tensor after the <PAD> tokens
-            # -infinity
+            # True to signify that the position should not be attended to
             for i in range(0, len(end_pos)):
                 if end_pos[i] == -1:
                     continue
-                masks[i, end_pos[i]+1:] = -torch.inf
-                masks.permute(0, 2, 1)[i, end_pos[i]+1:] = -torch.inf
+                masks[i, end_pos[i]+1:] = True
                 
-            
             # Return the output and the masks
             return out_sent, masks
         

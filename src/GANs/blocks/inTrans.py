@@ -9,7 +9,7 @@ from ..blocks.MHA import MHA
 
 class inTrans(nn.Module):
     # Inputs:
-    #   E_1 - Input embedding size
+    #   E - Input embedding size
     #   num_heads - Number of heads in each MHA block
     #   FF_embedding - embedding size of the output of the
     #                  Feed-forward block
@@ -29,11 +29,12 @@ class inTrans(nn.Module):
     
     
     # Input:
-    #   A tensor of the shape (S, E_2) that comes from the input
+    #   A tensor of the shape (N, S, E_2) that comes from the input
     #     embeddings we want to encode
-    def forward(self, X):
+    #   Optional tensor of shape (N, S)
+    def forward(self, X, masks=None):
         X_saved = X.clone()
-        X = self.MHA(X, X)
+        X = self.MHA(X, X, masks)
         X += X_saved
         X = self.LN1(X.contiguous())
         

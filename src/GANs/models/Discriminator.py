@@ -36,7 +36,6 @@ class Discriminator(nn.Module):
         
         # If the embed mode is PCA, use the PCA algorithm to transform
         # the input of shape [vocab size] to the shape [embedding_size]
-        
         # If the embed mode is FC, use a FC layer to make the transformation
         if self.embed_mode != "pca":
             self.encodingTransform = nn.Linear(vocab_size, embedding_size, device=device)
@@ -60,11 +59,14 @@ class Discriminator(nn.Module):
     
     
     # Input:
-    #   3-D tensor of shape (N, sequence_length, vocab_size)
+    #   X - 3-D tensor of shape (N, sequence_length, vocab_size)
+    #   masks - An optional tensor of shape (N, S) used
+    #           to mask the tokens after the first <END> token
+    #           in each sequence
     # Output
     #   2-D tensor of shape (N, 1) where each value is the
     #   prediction on how real the input is between -1 and 1
-    def forward(self, X):
+    def forward(self, X, masks=None):
         # Apply the encoding transformation to get the embeddings
         # to the desired embedding size
         if self.embed_mode == "pca":
@@ -73,7 +75,12 @@ class Discriminator(nn.Module):
             X = self.encodingTransform(X)
         
         # Send the input through the discriminator blocks
-        X = self.discBlocks(X)
+        if masks != None:
+            X = self.discBlocks[0](X, masks)
+            for b in self.discBlocks[1:]:
+                X = b(X)
+        else:
+            X = self.discBlocks(X)
         
         # Add the class token to the output of the blocks
         X = torch.cat((self.clsTok, X), dim=1)
