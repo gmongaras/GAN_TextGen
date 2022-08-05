@@ -58,6 +58,8 @@ class GAN_Model(nn.Module):
     #   dynamic_n_G - True to dynamically change the number of times to train
     #                 the generator. False otherwise
     #   Beta_n - Number of steps till Beta is recalculated for dynamic G
+    #   HideAfterEnd - True to hide any tokens after the <END> token in the 
+    #                  discriminator MHA with a mask, False to keep these tokens visibile
     #   n_D - Number of times to train the discriminator more than the generator for each epoch
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   gen_outEnc_mode - How should the generator encode its output? ("norm" or "gumb")
@@ -79,7 +81,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, Beta_n, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, Beta_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -92,6 +94,7 @@ class GAN_Model(nn.Module):
         self.loadInEpoch = loadInEpoch
         self.dynamic_n_G = dynamic_n_G
         self.Beta_n = Beta_n
+        self.HideAfterEnd = HideAfterEnd
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
         # Saving paramters
@@ -227,7 +230,10 @@ class GAN_Model(nn.Module):
                 
                 # Generate some data from the generator
                 with torch.no_grad():
-                    Y = self.generator.forward_train()
+                    if self.HideAfterEnd:
+                        Y, masks = self.generator.forward_train(self.HideAfterEnd)
+                    else:
+                        Y = self.generator.forward_train(self.HideAfterEnd)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
