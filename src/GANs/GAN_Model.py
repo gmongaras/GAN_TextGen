@@ -365,8 +365,7 @@ class GAN_Model(nn.Module):
                     
                 
                 # Generate some data from the generator
-                with torch.no_grad():
-                    Y = self.generator.forward_train()
+                Y = self.generator.forward_train()
                 
                 # Generate masks for the fake data
                 if self.HideAfterEnd:
