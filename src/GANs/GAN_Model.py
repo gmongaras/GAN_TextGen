@@ -184,6 +184,43 @@ class GAN_Model(nn.Module):
     
     
     
+    
+    # Given some encoded sentence data, return masks masking tokens
+    # after the first <END> token in the sentence
+    # Input:
+    #   data - Data of the shape (N, S, V)
+    # Output:
+    #   Masks of the shape (N, S)
+    def getMasks(self, data):
+        # Position of any <END> tokens in the outut
+        end_pos = data.shape[1]*torch.ones((data.shape[0]), requires_grad=False, dtype=torch.int16)
+        
+        # Get the position of the first <END> token for each generated sequence
+        whereEnd = torch.where(torch.argmax(data, dim=-1).cpu() == self.vocab_inv["<END>"])
+        uniq = torch.unique(whereEnd[0], dim=0, sorted=False, return_inverse=True, return_counts=True)
+        vals = torch.zeros(uniq[0].shape, dtype=torch.int16, requires_grad=False)
+        i = 0
+        for j in range(0, uniq[0].shape[0]):
+            vals[j] = whereEnd[1][i]
+            i += uniq[2][j]
+        end_pos[uniq[0]] = vals.to(torch.int16)
+        end_pos = end_pos.long()
+        
+        # Generate a tensor used to mask the MHA
+        masks = torch.zeros((data.shape[0], data.shape[1]), dtype=torch.bool, requires_grad=False, device=self.device)
+        
+        # Make all parts of the tensor after the <PAD> tokens
+        # True to signify that the position should not be attended to
+        for i in range(0, len(end_pos)):
+            if end_pos[i] == -1:
+                continue
+            masks[i, end_pos[i]+1:] = True
+            
+        # Return the output and the masks
+        return masks.to(self.device) 
+    
+    
+    
     # Train the models
     # Input:
     #   X - A list of sentences to train the models on
@@ -202,6 +239,8 @@ class GAN_Model(nn.Module):
         self.discLoss = []
         self.discLoss_real = []
         self.discLoss_fake = []
+        
+        masks = None
         
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
@@ -230,17 +269,15 @@ class GAN_Model(nn.Module):
                 
                 # Generate some data from the generator
                 with torch.no_grad():
-                    if self.HideAfterEnd:
-                        Y, masks = self.generator.forward_train(self.HideAfterEnd)
-                    else:
-                        Y = self.generator.forward_train(self.HideAfterEnd)
+                    Y = self.generator.forward_train()
+                
+                # Generate masks for the fake data
+                if self.HideAfterEnd:
+                    masks = self.getMasks(Y)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                if self.HideAfterEnd:
-                    disc_fake = torch.squeeze(self.discriminator(Y, masks))
-                else:
-                    disc_fake = torch.squeeze(self.discriminator(Y))
+                disc_fake = torch.squeeze(self.discriminator(Y, masks))
                 
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:
@@ -276,9 +313,13 @@ class GAN_Model(nn.Module):
                 # We don't need the generated output anymore
                 del Y
                 
-                # Send the real output throuh the discriminator to
+                # Get masks for the real data
+                if self.HideAfterEnd:
+                    masks = self.getMasks(real_X)
+                
+                # Send the real output through the discriminator to
                 # get a batch of predictions on the real sentences
-                disc_real = torch.squeeze(self.discriminator(real_X)) # Predictions
+                disc_real = torch.squeeze(self.discriminator(real_X, masks))
                 
                 # Get the discriminator loss
                 #discLoss = minimax_disc(disc_real, disc_fake)
@@ -324,17 +365,16 @@ class GAN_Model(nn.Module):
                     
                 
                 # Generate some data from the generator
+                with torch.no_grad():
+                    Y = self.generator.forward_train()
+                
+                # Generate masks for the fake data
                 if self.HideAfterEnd:
-                    Y, masks = self.generator.forward_train(self.HideAfterEnd)
-                else:
-                    Y = self.generator.forward_train(self.HideAfterEnd)
+                    masks = self.getMasks(Y)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                if self.HideAfterEnd:
-                    disc_fake = torch.squeeze(self.discriminator(Y, masks))
-                else:
-                    disc_fake = torch.squeeze(self.discriminator(Y))
+                disc_fake = torch.squeeze(self.discriminator(Y, masks))
                 
                 # Get the generator loss
                 #genLoss = minimax_gen(disc_fake)
@@ -355,6 +395,7 @@ class GAN_Model(nn.Module):
             # Flip the maximizing values to represent the actual value
             genLoss *= -1
             discLoss_real *= -1
+            discLoss *= -1
             
             
             # Save the loss values

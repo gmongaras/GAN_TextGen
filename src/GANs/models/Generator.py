@@ -257,14 +257,11 @@ class Generator(nn.Module):
 
     # Forward pass used during training
     # Input:
-    #   HideAfterEnd - True to hide any tokens after the <END> token in the 
-    #                  discriminator MHA with a mask, False to keep these tokens visibile
+    #   None
     # Output:
     #   A 3-D tensor of shape (N, sequence_length, vocab_size)
     #      where the vocab_size is a softmaxed output
-    #   If HideAfterEnd is True, then a masks tensor of shape
-    #      (N, sequence_length) is also outputted
-    def forward_train(self, HideAfterEnd=False):
+    def forward_train(self):
         # Put the model in train mode
         self.train()
         
@@ -279,11 +276,11 @@ class Generator(nn.Module):
         # Get a forward pass from the network
         if self.embed_mode == "custom":
             return self.forward_train_custom(w)
-        return self.forward_train_norm(w, HideAfterEnd)
+        return self.forward_train_norm(w)
     
     
     # Forward train using normal Word2Vec embeddings
-    def forward_train_norm(self, w, HideAfterEnd):
+    def forward_train_norm(self, w):
         # Initiailze the model output to <START> tokens
         Y = torch.broadcast_to(self.Word2Vec.to(self.device)(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
         
@@ -361,35 +358,6 @@ class Generator(nn.Module):
         # Turn the output into a tensor
         out_sent = [torch.stack(sent) for sent in out_sent]
         out_sent = torch.stack(out_sent)
-        
-        
-        if HideAfterEnd:
-            # Position of any <END> tokens in the outut
-            end_pos = Y.shape[1]*torch.ones((Y.shape[0]), requires_grad=False, dtype=torch.int16)
-            
-            # Get the position of the first <END> token for each generated sequence
-            whereEnd = torch.where(torch.argmax(out_sent, dim=-1).cpu() == self.vocab_inv["<END>"])
-            uniq = torch.unique(whereEnd[0], dim=0, sorted=False, return_inverse=True, return_counts=True)
-            vals = torch.zeros(uniq[0].shape, dtype=torch.int16, requires_grad=False)
-            i = 0
-            for j in range(0, uniq[0].shape[0]):
-                vals[j] = whereEnd[1][i]
-                i += uniq[2][j]
-            end_pos[uniq[0]] = vals.to(torch.int16)
-            end_pos = end_pos.long()
-            
-            # Generate a tensor used to mask the MHA
-            masks = torch.zeros((out_sent.shape[0], out_sent.shape[1]), dtype=torch.bool, requires_grad=False, device=self.device)
-            
-            # Make all parts of the tensor after the <PAD> tokens
-            # True to signify that the position should not be attended to
-            for i in range(0, len(end_pos)):
-                if end_pos[i] == -1:
-                    continue
-                masks[i, end_pos[i]+1:] = True
-                
-            # Return the output and the masks
-            return out_sent, masks.to(self.device) 
         
         # Return the output
         return out_sent
