@@ -354,7 +354,6 @@ class Generator(nn.Module):
             # <NEXT> token to the sequence
             if tok+1 < self.sequence_length:
                 Y = torch.cat((Y.clone()[:, :tok], (out_tok + posEnc[:, tok]).unsqueeze(1)), dim=1)
-                #Y[:, tok] = out_tok + posEnc[:, tok] # Replace the <NEXT> token with the new token prediction with position encodings
                 Y = torch.cat((Y, nextTok.clone()), dim=1) # Add the <NEXT> token
                 Y[:, tok+1] += posEnc[:, tok+1] # Add positional encodings to the <NEXT> token
                 
@@ -366,14 +365,10 @@ class Generator(nn.Module):
         
         if HideAfterEnd:
             # Position of any <END> tokens in the outut
-            end_pos = Y.shape[1]*torch.ones((Y.shape[0]), requires_grad=False, device=self.device, dtype=torch.int16)
+            end_pos = Y.shape[1]*torch.ones((Y.shape[0]), requires_grad=False, dtype=torch.int16)
             
             # Get the position of the first <END> token for each generated sequence
-            out_sent[:5, 4] = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<END>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-            out_sent[:32, 8] = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<END>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-            out_sent[16:32, 30] = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<END>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-            out_sent[48:, 8] = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<END>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-            whereEnd = torch.where(torch.argmax(out_sent, dim=-1) == self.vocab_inv["<END>"])
+            whereEnd = torch.where(torch.argmax(out_sent, dim=-1).cpu() == self.vocab_inv["<END>"])
             uniq = torch.unique(whereEnd[0], dim=0, sorted=False, return_inverse=True, return_counts=True)
             vals = torch.zeros(uniq[0].shape, dtype=torch.int16, requires_grad=False)
             i = 0
@@ -394,7 +389,7 @@ class Generator(nn.Module):
                 masks[i, end_pos[i]+1:] = True
                 
             # Return the output and the masks
-            return out_sent, masks
+            return out_sent, masks.to(self.device) 
         
         # Return the output
         return out_sent

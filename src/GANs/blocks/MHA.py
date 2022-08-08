@@ -43,8 +43,8 @@ class MHA(nn.Module):
     def forward(self, X_1, X_2, masks=None):
         # Get the key, query, value embedings
         value = self.value_weights(X_2)
-        query = torch.broadcast_to(self.query_weights(X_1), value.shape)
-        key = torch.broadcast_to(self.key_weights(X_1), value.shape)
+        query = self.query_weights(X_1)
+        key = self.key_weights(X_1)
         
         # Get the MHA value and return it
-        return self.MultiHeadAtt(query, key, value, attn_mask=masks, need_weights=False)[0]
+        return self.MultiHeadAtt(query, key, value, key_padding_mask=masks, need_weights=False)[0]

@@ -321,13 +321,20 @@ class GAN_Model(nn.Module):
                 else:
                     disc_sub = disc_sub.to(self.device)
                     disc_nums = disc_nums.to(self.device)
+                    
                 
                 # Generate some data from the generator
-                Y = self.generator.forward_train()
+                if self.HideAfterEnd:
+                    Y, masks = self.generator.forward_train(self.HideAfterEnd)
+                else:
+                    Y = self.generator.forward_train(self.HideAfterEnd)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
+                if self.HideAfterEnd:
+                    disc_fake = torch.squeeze(self.discriminator(Y, masks))
+                else:
+                    disc_fake = torch.squeeze(self.discriminator(Y))
                 
                 # Get the generator loss
                 #genLoss = minimax_gen(disc_fake)
