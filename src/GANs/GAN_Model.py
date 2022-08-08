@@ -217,7 +217,7 @@ class GAN_Model(nn.Module):
             masks[i, end_pos[i]+1:] = True
             
         # Return the output and the masks
-        return masks.to(self.device) 
+        return masks.to(self.device if self.dev != "partgpu" else gpu) 
     
     
     
