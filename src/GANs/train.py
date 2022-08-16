@@ -31,12 +31,12 @@ from typing import Optional
 
 
 # General model parameters
-@click.option("--M_gen", "M_gen", type=int, default=6, help="Number of noise encoding blocks in the generator", required=False)
-@click.option("--B_gen", "B_gen", type=int, default=6, help="Number of generator blocks in the generator", required=False)
+@click.option("--M_gen", "M_gen", type=int, default=2, help="Number of noise encoding blocks in the generator", required=False)
+@click.option("--B_gen", "B_gen", type=int, default=2, help="Number of generator blocks in the generator", required=False)
 @click.option("--O_gen", "O_gen", type=int, default=2, help="Number of MHA blocks for each generator block in the generator", required=False)
 @click.option("--embedding_size_gen", "embedding_size_gen", type=int, default=64, help="Word embedding size for the generator", required=False)
-@click.option("--T_disc", "T_disc", type=int, default=6, help="Number of transformer blocks in each discriminator block", required=False)
-@click.option("--B_disc", "B_disc", type=int, default=4, help="Number of discriminator blocks in the discriminator", required=False)
+@click.option("--T_disc", "T_disc", type=int, default=2, help="Number of transformer blocks in each discriminator block", required=False)
+@click.option("--B_disc", "B_disc", type=int, default=2, help="Number of discriminator blocks in the discriminator", required=False)
 @click.option("--O_disc", "O_disc", type=int, default=2, help="Number of output MHA blocks for each transformer in the discrimiantor", required=False)
 @click.option("--embedding_size_disc", "embedding_size_disc", type=int, default=64, help="Word embedding size for the discriminator", required=False)
 @click.option("--batchSize", "batchSize", type=int, default=64, help="Batch size used to train the model", required=False)
@@ -49,22 +49,22 @@ from typing import Optional
 @click.option("--gen_outEnc_mode", "gen_outEnc_mode", type=str, default="norm", help="How should the outputs of the generator be encoded? (\"norm\" to use a softmax output or \"gumb\" to use a gumbel-softmax output)", required=False)
 @click.option("--embed_mode_gen", "embed_mode_gen", type=str, default="norm", help="Embedding mode for the generator (\"norm\" for normal Word2Vec embeddings or \"custom\" for custom embeddings)", required=False)
 @click.option("--embed_mode_disc", "embed_mode_disc", type=str, default="fc", help="Embedding mode for the discriminator (\"fc\" to use a fully-connected layer or \"pca\" to use PCA embeddings)", required=False)
-@click.option("--alpha", "alpha", type=float, default=0.0001, help="Model learning rate", required=False)
-@click.option("--Beta1", "Beta1", type=float, default=0.9, help="Adam beta 1 term", required=False)
-@click.option("--Beta2", "Beta2", type=float, default=0.999, help="Adam beta 2 term", required=False)
+@click.option("--alpha", "alpha", type=float, default=0.00005, help="Model learning rate", required=False)
+@click.option("--Beta1", "Beta1", type=float, default=0, help="Adam beta 1 term", required=False)
+@click.option("--Beta2", "Beta2", type=float, default=0.9, help="Adam beta 2 term", required=False)
 @click.option("--device", "device", type=str, default="cpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
 @click.option("--epochs", "epochs", type=int, default=300000, help="Number of epochs to train the model", required=False)
-@click.option("--n_D", "n_D", type=int, default=6, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
-@click.option("--saveSteps", "saveSteps", type=int, default=1000, help="Number of steps until the model is saved", required=False)
+@click.option("--n_D", "n_D", type=int, default=10, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
+@click.option("--saveSteps", "saveSteps", type=int, default=100, help="Number of steps until the model is saved", required=False)
 @click.option("--loadInEpoch", "loadInEpoch", type=bool, default=False, help="Should the data be loaded in as needed instead of before training? (True if so, False to load before training)", required=False)
 @click.option("--delWhenLoaded", "delWhenLoaded", type=bool, default=True, help="Delete the data as it's loaded in to free allocated memory? Note: This is automatically False if loadInEpoch is True", required=False)
 
 
 # GAN parameters (if used)
 @click.option("--Lambda", "Lambda", type=int, default=10, help="Lambda value used for gradient penalty in disc loss", required=False)
-@click.option("--dynamic_n_G", "dynamic_n_G", type=bool, default=True, help="True to dynamically change the number of times to train the generator. False otherwise", required=False)
-@click.option("--Beta_n", "Beta_n", type=int, default=25, help="(Only used if dynamic_n_G is True) Number of steps till Beta is recalculated", required=False)
-@click.option("--HideAfterEnd", "HideAfterEnd", type=bool, default=True, help="True to hide any tokens after the <END> token in the discriminator MHA with a mask, False to keep these tokens visibile", required=False)
+@click.option("--dynamic_n", "dynamic_n", type=bool, default=False, help="True to dynamically change the number of times to train the models. False otherwise", required=False)
+@click.option("--Lambda_n", "Lambda_n", type=int, default=1, help="(Only used if dynamic_n is True) Amount to scale the generator over the discriminator to give the generator a higher weight (when >1) or the discriminator a higher weight (when <1)", required=False)
+@click.option("--HideAfterEnd", "HideAfterEnd", type=bool, default=False, help="True to hide any tokens after the <END> token in the discriminator MHA with a mask, False to keep these tokens visibile", required=False)
 
 
 # Diffusion GAN parameters (if used)
@@ -114,8 +114,8 @@ def train(
     delWhenLoaded: Optional[bool],
 
     Lambda: Optional[int],
-    dynamic_n_G: Optional[bool],
-    Beta_n: Optional[int],
+    dynamic_n: Optional[bool],
+    Lambda_n: Optional[int],
     HideAfterEnd: Optional[bool],
 
     Beta_0: Optional[float],
@@ -161,7 +161,7 @@ def train(
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
-                sequence_length, num_heads, dynamic_n_G, Beta_n, HideAfterEnd,
+                sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd,
                 n_D, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
@@ -177,8 +177,8 @@ def train(
     
     
     ### Training The Model ###
-    #model.loadModels(loadDir, genLoadFile, discLoadFile)
-    model.train_model(sentences, epochs)
+    model.loadModels("models", "gen_model - 9500.pkl", "disc_model - 100.pkl")
+    #model.train_model(sentences, epochs)
     print()
     
     

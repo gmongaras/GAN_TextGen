@@ -21,7 +21,7 @@ class inTrans(nn.Module):
         
         # Feed-foward block after the MHA blocks
         self.FF = nn.Linear(E, FF_embedding)
-        self.ReLU = nn.ReLU()
+        self.ReLU = nn.SiLU()
         
         # Layer normalization blocks
         self.LN1 = nn.LayerNorm(E)

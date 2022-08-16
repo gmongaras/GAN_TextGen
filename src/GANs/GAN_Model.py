@@ -55,9 +55,10 @@ class GAN_Model(nn.Module):
     #   embedding_size_disc - Embedding size of the discriminator
     #   sequence_length - The max length of the sentence to train the model on
     #   num_heads - Number of heads for the MHA modules
-    #   dynamic_n_G - True to dynamically change the number of times to train
-    #                 the generator. False otherwise
-    #   Beta_n - Number of steps till Beta is recalculated for dynamic G
+    #   dynamic_n - True to dynamically change the number of times to train the models. False otherwise
+    #   Lambda_n - (Only used if dynamic_n is True) Amount to scale the discriminator over 
+    #               the generator to give the discriminator a higher weight (when >1) or the 
+    #               generator a higher weight (when <1)
     #   HideAfterEnd - True to hide any tokens after the <END> token in the 
     #                  discriminator MHA with a mask, False to keep these tokens visibile
     #   n_D - Number of times to train the discriminator more than the generator for each epoch
@@ -81,7 +82,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n_G, Beta_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -92,8 +93,8 @@ class GAN_Model(nn.Module):
         self.n_D = n_D
         self.Lambda = Lambda
         self.loadInEpoch = loadInEpoch
-        self.dynamic_n_G = dynamic_n_G
-        self.Beta_n = Beta_n
+        self.dynamic_n = dynamic_n
+        self.Lambda_n = Lambda_n
         self.HideAfterEnd = HideAfterEnd
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
@@ -149,12 +150,6 @@ class GAN_Model(nn.Module):
     #   x - A sample of real data
     #   x_tilde - A sample of data from the generator
     def get_gradient_penalty(self, x, x_tilde):
-        # So that NaN values aren't produced, make any numbers
-        # x_tilde that are exactly 1 or 0 slightly smaller or
-        # slightly larger
-        x_tilde = torch.where(x_tilde == 1.0, x_tilde-0.0001, x_tilde)
-        x_tilde = torch.where(x_tilde == 0.0, x_tilde+0.0001, x_tilde)
-        
         # Get the device
         device = self.device
         if self.dev == "partgpu":
@@ -166,7 +161,9 @@ class GAN_Model(nn.Module):
         
         # Create a new tensor fo the same shape as the real and fake data
         x_hat = epsilon*x + (1-epsilon)*x_tilde
-        x_hat = x_hat.detach().clone()
+
+        # We only want the gradients of the discriminator
+        x_hat = x_hat.clone().detach()
         x_hat = torch.autograd.Variable(x_hat, requires_grad=True)
         
         # Send the transformed and combined data through the
@@ -240,7 +237,12 @@ class GAN_Model(nn.Module):
         self.discLoss_real = []
         self.discLoss_fake = []
         
+        # Initial variable states
         masks = None
+        r_d = 1 # Initial states for dynamic_n
+        r_g = 0
+        L_p_g = None
+        L_p_d = None
         
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
@@ -252,9 +254,10 @@ class GAN_Model(nn.Module):
             # has left to see and the Generator has left to see
             disc_nums = torch.randperm(s, device=self.device)
             
-            # Train the discriminator first
+            # Train the discriminator first or if dynamic_n is used and
+            # r_d > r_g
             self.optim_disc.zero_grad()
-            for i in range(0, max(self.n_D, 1)):
+            for i in range(0, max(self.n_D, 1) if self.dynamic_n == False else (1 if r_d > self.Lambda_n*r_g or L_p_g == None else 0)):
                 # Sample data for the discriminator
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
@@ -338,19 +341,12 @@ class GAN_Model(nn.Module):
                 self.optim_disc.zero_grad()
 
                 # Delete all discriminator stuff as its no longer needed
-                del disc_sub, disc_fake, real_X, gradient_penalty, disc_real
-            
-            # Using the current loss values, calculate a new n_G, the
-            # number of times to train the generator
-            if len(self.discLoss) >= 1 and self.dynamic_n_G == True:
-                n_G = np.ceil(self.Beta*np.exp((np.abs(discLoss.detach().cpu().numpy())-np.abs(self.discLoss[-1])))).astype(np.int)
-                n_G = np.min([n_G, self.n_D]) # Limit the value to the number of times the discriminator is trained
-            else:
-                n_G = 1
+                gradient_penalty = gradient_penalty.cpu().detach().item()
+                del disc_sub, disc_fake, real_X, disc_real
             
             # Train the generator next
             self.optim_gen.zero_grad()
-            for i in range(0, max(n_G, 1)):
+            for i in range(0, 1 if self.dynamic_n == False else (1 if r_d <= self.Lambda_n*r_g or L_p_g == None else 0)):
                 # Sample real data for the second loss function
                 disc_sub = disc_nums[:self.batchSize]
                 disc_nums = disc_nums[self.batchSize:]
@@ -389,6 +385,16 @@ class GAN_Model(nn.Module):
             
                 # Delete all generator stuff as its no longer needed
                 del disc_sub, disc_fake, Y
+
+            
+            # Dynamic n updates:
+            if self.dynamic_n == True:
+                if L_p_g == None:
+                    L_p_g = -genLoss.item() # flip loss as the paper uses L_g = fake, we use L_d = -fake
+                    L_p_d = -discLoss.item() # flip loss as the paper uses L_d = real - fake, we use L_d = fake - real
+                L_c_g, L_c_d = -genLoss.item(), -discLoss.item()
+                r_g, r_d = np.abs((L_c_g - L_p_g)/L_p_g), np.abs((L_c_d - L_p_d)/L_p_d)
+                L_p_g, L_p_d = -genLoss.item(), -discLoss.item()
             
             
             # Flip the maximizing values to represent the actual value
@@ -403,13 +409,9 @@ class GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            # Beta changing for n_G
-            if epoch % self.Beta_n == 0 and self.dynamic_n_G == True and epoch > 100:
-                self.Beta = np.max([1, self.Beta + np.tanh((np.abs(self.discLoss[-1])-np.abs(self.discLoss[-self.Beta_n]))/self.Beta_n)])
-            
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}", end="")
-            if self.dynamic_n_G == True:
-                print(f"    n_G: {n_G}    Beta: {self.Beta}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}", end="")
+            if self.dynamic_n:
+                print(f"    r_g: {round(r_g, 4)}    r_d: {round(r_d, 4)}", end="")
             print()
     
     
