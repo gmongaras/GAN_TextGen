@@ -198,7 +198,7 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
             continue
         
         # Turn the encoded words into a list and save it
-        encoded.append(torch.stack(enc_words).detach().to(device))
+        encoded.append(torch.stack(enc_words).detach().to(device).to(torch.bool))
         
         if deleteOrig == True:
             del X[i]

@@ -14,8 +14,8 @@ from typing import Optional
 @click.command()
 
 # File loading parameters
-@click.option("--input_file", "input_file", type=str, default="data/Fortunes/data.txt", help="Location of the txt file with sentences to train the model", required=False)
-@click.option("--vocab_file", "vocab_file", type=str, default="vocab_fortunes.csv", help="Location of the csv file storing the vocabulary dictionary", required=False)
+@click.option("--input_file", "input_file", type=str, default="data/Text2/data.txt", help="Location of the txt file with sentences to train the model", required=False)
+@click.option("--vocab_file", "vocab_file", type=str, default="vocab_text2.csv", help="Location of the csv file storing the vocabulary dictionary", required=False)
 
 
 # Model/graph saving parameters
@@ -31,12 +31,12 @@ from typing import Optional
 
 
 # General model parameters
-@click.option("--M_gen", "M_gen", type=int, default=6, help="Number of noise encoding blocks in the generator", required=False)
-@click.option("--B_gen", "B_gen", type=int, default=6, help="Number of generator blocks in the generator", required=False)
+@click.option("--M_gen", "M_gen", type=int, default=2, help="Number of noise encoding blocks in the generator", required=False)
+@click.option("--B_gen", "B_gen", type=int, default=2, help="Number of generator blocks in the generator", required=False)
 @click.option("--O_gen", "O_gen", type=int, default=2, help="Number of MHA blocks for each generator block in the generator", required=False)
 @click.option("--embedding_size_gen", "embedding_size_gen", type=int, default=64, help="Word embedding size for the generator", required=False)
-@click.option("--T_disc", "T_disc", type=int, default=6, help="Number of transformer blocks in each discriminator block", required=False)
-@click.option("--B_disc", "B_disc", type=int, default=6, help="Number of discriminator blocks in the discriminator", required=False)
+@click.option("--T_disc", "T_disc", type=int, default=2, help="Number of transformer blocks in each discriminator block", required=False)
+@click.option("--B_disc", "B_disc", type=int, default=2, help="Number of discriminator blocks in the discriminator", required=False)
 @click.option("--O_disc", "O_disc", type=int, default=2, help="Number of output MHA blocks for each transformer in the discrimiantor", required=False)
 @click.option("--embedding_size_disc", "embedding_size_disc", type=int, default=64, help="Word embedding size for the discriminator", required=False)
 @click.option("--batchSize", "batchSize", type=int, default=64, help="Batch size used to train the model", required=False)
@@ -52,7 +52,7 @@ from typing import Optional
 @click.option("--alpha", "alpha", type=float, default=0.00005, help="Model learning rate", required=False)
 @click.option("--Beta1", "Beta1", type=float, default=0, help="Adam beta 1 term", required=False)
 @click.option("--Beta2", "Beta2", type=float, default=0.9, help="Adam beta 2 term", required=False)
-@click.option("--device", "device", type=str, default="cpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
+@click.option("--device", "device", type=str, default="partgpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
 @click.option("--epochs", "epochs", type=int, default=300000, help="Number of epochs to train the model", required=False)
 @click.option("--n_D", "n_D", type=int, default=10, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
 @click.option("--saveSteps", "saveSteps", type=int, default=1000, help="Number of steps until the model is saved", required=False)

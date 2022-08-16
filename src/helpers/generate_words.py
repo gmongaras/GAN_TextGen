@@ -1,12 +1,14 @@
 from .helpers import get_clean_words
+import random
 
 
 # Generate a vocab file csv with two columns, a key
 # and a value
 def generate():
-    vocabFile = "data/Fortunes/data.txt"
-    outFile = "vocab_fortunes.csv"
+    vocabFile = "data/Text2/data.txt"
+    outFile = "vocab_text2.csv"
     limit = 1000000000000
+    randomize = True # Randomize the vocab to stray from bias
     
     
     # The created vocab as each word is seen
@@ -44,6 +46,13 @@ def generate():
         if len(vocab.keys()) > limit:
             break
     file.close()
+
+    # Shuffle the vocab
+    if randomize:
+        k = list(vocab.keys())
+        random.shuffle(k)
+        vocab = {k[i]:i for i in range(0, len(k))}
+
     
     # Save the vocab as a csv
     file = open(outFile, "w", encoding="utf-8")
