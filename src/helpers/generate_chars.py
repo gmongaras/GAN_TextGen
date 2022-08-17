@@ -1,51 +1,51 @@
-from helpers import get_clean_words
-
+import sys
 
 
 
 # Generate a vocab file csv with two columns, a key
 # and a value
 def generate():
-    vocabFile = "data/Text/data.txt"
-    outFile = "vocab_text.csv"
+    vocabFile = "data/Fortunes/data.txt"
+    outFile = "vocab_chars.csv"
     limit = 1000000000000
+    startTok = "¶"
+    endTok = "∅"
+    padTok = "↔"
+    lowercase = False
     
     
     # The created vocab as each word is seen
-    vocab = {"<START>": 0, "<PAD>": 1, "<END>": 2, "<UNKNOWN>": 3}
+    vocab = {startTok: 0, endTok: 1, padTok: 2}
     
     i = len(vocab)
     
     # Iterate over all lines in the file
-    file = open(vocabFile, "r")
+    file = open(vocabFile, "r", encoding='utf-8')
     for line in file:
-        
-        # Get the words
-        words = get_clean_words(line)
-        
-        # Breakup the line into spaces and store any new words
-        for word in words:
-            # If the word is blank, don't add it
-            if len(word) == 0:
-                continue
+        # Iterate over each character in the line:
+        for char in line:
+            # Make the character lowercased
+            if lowercase:
+                char = char.lower() 
             
-            # If the word is not already in the dictionary,
+            # If the character is not already in the dictionary,
             # add it
-            if word not in vocab:
-                vocab[word.lower()] = i
+            if char not in vocab:
+                vocab[char] = i
                 i += 1
             
             # Check if the limit has been reached
             if len(vocab.keys()) > limit:
                 break
-        
+                
         # Check if the limit has been reached
         if len(vocab.keys()) > limit:
             break
+        
     file.close()
     
     # Save the vocab as a csv
-    file = open(outFile, "w")
+    file = open(outFile, "w", encoding="utf-8")
     for key in vocab.keys():
         file.write(f"{vocab[key]},{key}\n")
         

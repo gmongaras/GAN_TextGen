@@ -1,4 +1,4 @@
-from blocks.inTrans import inTrans
+from ..blocks.inTrans import inTrans
 from torch import nn
 
 
@@ -29,10 +29,15 @@ class discBlock(nn.Module):
     
     # Input:
     #   3-D tensor of shape (N, S, embedding_size)
+    #   Optional 3-D tensor of shape (N, S)
     # Output:
     #   3-D tensor of shape (N, S//2, 2)
-    def forward(self, X):
-        X = self.trans(X)
+    def forward(self, X, masks=None):
+        if masks != None:
+            for b in self.trans:
+                X = b(X, masks)
+        else:
+            X = self.trans(X)
         if hasattr(self, 'pool'):
             X = self.pool(X.permute(0, 2, 1)).permute(0, 2, 1)
         return X

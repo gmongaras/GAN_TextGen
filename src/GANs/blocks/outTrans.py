@@ -1,7 +1,7 @@
 import imp
 import torch
 from torch import nn
-from blocks.MHA import MHA
+from ..blocks.MHA import MHA
 
 
 
@@ -33,7 +33,7 @@ class outTrans(nn.Module):
         
         # Feed-foward block after the MHA blocks
         self.FF = nn.Linear(E_2, FF_embedding, device=device)
-        self.ReLU = nn.ReLU()
+        self.ReLU = nn.SiLU()
         
         # Layer normalization blocks
         self.LN1 = nn.LayerNorm(E_2, device=device)

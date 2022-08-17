@@ -1,8 +1,8 @@
 import torch
-from Diff_GAN_Model import Diff_GAN_Model
-from GAN_Model import GAN_Model
-from Norm_Model import Norm_Model
-from helpers.helpers import loadVocab
+from .Diff_GAN_Model import Diff_GAN_Model
+from .GAN_Model import GAN_Model
+from .Norm_Model import Norm_Model
+from ..helpers.helpers import loadVocab
 
 
 
@@ -15,15 +15,15 @@ def main():
     vocab_file = "vocab_fortunes.csv"
     
     # Saving/Loading paramters
-    saveDir = "models-gumb"
+    saveDir = "models"
     genSaveFile = "gen_model.pkl"
     discSaveFile = "disc_model.pkl"
     trainGraphFile = "trainGraph.png"
     TgraphFile = "TGraph.png" # Only used for diffusion GAN
     
-    loadDir = "models-gumb"
-    genLoadFile = "gen_model.pkl"
-    discLoadFile = "disc_model.pkl"
+    loadDir = "models"
+    genLoadFile = "fort.pkl"
+    discLoadFile = "disc.pkl"
     
     
     
@@ -49,17 +49,21 @@ def main():
     M_gen = 6                # Number of noise encoding blocks in the generator
     B_gen = 6                # Number of generator blocks in the generator
     O_gen = 2                # Number of MHA blocks in the generator
-    gausNoise = True         # True to add pure gaussian noise in the generator output
-                             # encoding, False to not add this noise
+    embedding_size_gen = 64  # Embedding size of the generator
     T_disc = 6               # Number of transformer blocks in each discriminator block
     B_disc = 4               # Number of discriminator blocks in the discriminator
-    O_disc = 2               # Number of output MHA blocks in the discrimiantor
-    batchSize = 64           # Batch size for the entire model
-    embedding_size_gen = 64  # Embedding size of the generator
+    O_disc = 2               # Number of output MHA blocks for each transformer in the discrimiantor
     embedding_size_disc = 64 # Embedding size of the discriminator
+    batchSize = 64           # Batch size for the entire model
                              # Note: If using PCA, keep this value small
     sequence_length = 64     # Sequence size to train the model with
     num_heads = 8            # Number of heads in each MHA block
+    dynamic_n_G = True       # True to dynamically change the number of times to train
+                             # the generator. False otherwise
+    Beta_n = 25              # Number of steps till Beta is recalculated
+                             # For dynamic G
+    gausNoise = True         # True to add pure gaussian noise in the generator output
+                             # encoding, False to not add this noise
     
     # Training parameters
     trainingMode = "gan"        # How should the models be trained ("gan", "diff", or "norm")
@@ -68,13 +72,12 @@ def main():
     embed_mode_gen = "norm"     # Embedding mode for the generator ("norm" or "custom")
     embed_mode_disc = "fc"      # Embedding mode for the discriminator ("fc" or "pca")
     alpha = 0.0001              # Model learning rate
-    Beta1 = 0                   # Adam beta 1 term
-    Beta2 = 0.9                 # Adam beta 2 term
+    Beta1 = 0.9                 # Adam beta 1 term
+    Beta2 = 0.999               # Adam beta 2 term
     Lambda = 10                 # Lambda value used for gradient penalty in disc loss
-    device = "partgpu"          # cpu, partgpu, or fullgpu
-    epochs = 300000             # Number of epoch to train the model
-    trainingRatio = [1, 6]      # Number of epochs to train the generator (0) vs the discriminator (1)
-    decRatRate = -1             # Decrease the ratio after every decRatRate steps (-1 for not decrease)
+    device = "cpu"              # cpu, partgpu, or fullgpu
+    epochs = 300000             # Number of epochs to train the model
+    n_D = 6                     # Number of times to train the discriminator more than the generator for each epoch
     saveSteps = 1000            # Number of steps until the model is saved
     loadInEpoch = False         # Should the data be loaded in as needed instead of
                                 # before training (True if so, False to load before training)
@@ -97,7 +100,7 @@ def main():
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
                 sequence_length, num_heads,
-                trainingRatio, decRatRate, pooling, gen_outEnc_mode,
+                n_D, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
@@ -108,8 +111,8 @@ def main():
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, gausNoise,
                 T_disc, B_disc, O_disc, 
                 batchSize, embedding_size_gen, embedding_size_disc,
-                sequence_length, num_heads,
-                trainingRatio, decRatRate, pooling, gen_outEnc_mode,
+                sequence_length, num_heads, dynamic_n_G, Beta_n,
+                n_D, pooling, gen_outEnc_mode,
                 embed_mode_gen, embed_mode_disc,
                 alpha, Lambda,
                 Beta1, Beta2, device, saveSteps, saveDir, 
@@ -136,4 +139,5 @@ def main():
         print(vocab[i.item()], end=" ")
     
     
-main()
+if __name__ == "__main__": 
+    main()

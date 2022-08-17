@@ -16,6 +16,22 @@ def binary_cross_entropy_loss(Y_fake, Y):
     return torch.nn.BCELoss(reduction="mean")(Y_fake, Y)
 
 
+# Loss function for the extra loss function added to the WGAN loss.
+# This directly evaluates the generator on real data to kind of push
+# it in the direction of the real distribution as if it were
+# a RNN generating a sequence.
+# Inputs:
+#   Y_fake - The generated output from the model to evaluate
+#   Y - The real data we want Y_fake to be
+def categorical_cross_entropy_loss(Y_fake, Y):
+    # Clamp the input between 0.000001 and infinity to
+    # avoid NaN or -inf loss values
+    Y_fake = torch.clamp(Y_fake, 0.00001, torch.inf)
+    
+    # Get the CCE loss across the batch
+    return torch.sum(-Y*torch.log(torch.clamp(Y_fake, 0.00001, torch.inf)), dim=-1).mean()
+
+
 
 
 # In this loss function, we want the critic to minimize the

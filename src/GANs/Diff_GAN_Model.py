@@ -1,25 +1,33 @@
-from helpers.helpers import encode_sentences
-from helpers.helpers import encode_sentences_one_hot
-from helpers.helpers import addPadding
-from helpers.helpers import addPadding_one_hot
+from .GAN_Model import GAN_Model
+from ..helpers.helpers import encode_sentences
+from ..helpers.helpers import encode_sentences_one_hot
+from ..helpers.helpers import addPadding
+from ..helpers.helpers import addPadding_one_hot
 
 
-from models.losses import wasserstein_disc
-from models.losses import wasserstein_disc_split
-from models.losses import wasserstein_gen
-from models.losses import minimax_disc
-from models.losses import minimax_gen
-from models.losses import minimax_loss
+from .models.losses import wasserstein_disc
+from .models.losses import wasserstein_disc_split
+from .models.losses import wasserstein_gen
+from .models.losses import minimax_disc
+from .models.losses import minimax_gen
+from .models.losses import minimax_loss
+from .models.losses import diff_disc
+from .models.losses import diff_disc_split
+from .models.losses import diff_gen
 
 
-from models.Generator import Generator
-from models.Discriminator import Discriminator
+from .models.Generator import Generator
+from .models.Discriminator import Discriminator
 import torch
 from torch import nn
 import numpy as np
-
 import matplotlib.pyplot as plt
 import os
+
+from .diffusion_resources.distributions import y_sample
+from .diffusion_resources.distributions import p_pie_sample
+from .diffusion_resources.schedulers import linear_variance_scheduler
+from .diffusion_resources.schedulers import T_scheduler
 
 
 
@@ -35,8 +43,7 @@ except:
 
 
 
-
-class GAN_Model(nn.Module):
+class Diff_GAN_Model(nn.Module):
     # Inputs:
     #   vocab - A dictionary of vocab where the keys are integers and the
     #           values are words
@@ -53,10 +60,7 @@ class GAN_Model(nn.Module):
     #   embedding_size_disc - Embedding size of the discriminator
     #   sequence_length - The max length of the sentence to train the model on
     #   num_heads - Number of heads for the MHA modules
-    #   trainingRatio - 2-D array representing the number of epochs to 
-    #                   train the generator (0) vs the discriminator (1)
-    #   decRatRate - Decrease the ratio after every decRatRate steps. Use -1 to
-    #                never decrease the ratio
+    #   n_D - Number of times to train the discriminator more than the generator for each epoch
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   gen_outEnc_mode - How should the generator encode its output? ("norm" or "gumb")
     #   embed_mode_gen - What embedding mode should be used for the
@@ -73,24 +77,29 @@ class GAN_Model(nn.Module):
     #   genSaveFile - Name of the file to save the generator model to
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
+    #   TgraphFile - File to save the T graph to
     #   loadInEpoch - Should the data be loaded in as needed instead of
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, trainingRatio, decRatRate, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
-        super(GAN_Model, self).__init__()
-        
-        # The ratio must not have a lower value for the discriminator (1)
-        assert trainingRatio[0]<=trainingRatio[1], "The training ratio must have a grater number in the zeroth index"
+    #   Beta_0 - Lowest possible Beta value, when t is 0
+    #   Beta_T - Highest possible Beta value, when t is T
+    #   T_min - Min diffusion steps when corrupting the data
+    #   T_max - Max diffusion steps when corrupting the data
+    #   sigma - Addative noise weighting term
+    #   d_target - Term used for the T scheduler denoting if the 
+    #               T change should be positive of negative depending 
+    #               on the disc output
+    #   C - Constant for the T scheduler multiplying the change of T
+    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, TgraphFile, loadInEpoch, delWhenLoaded, Beta_0, Beta_T, T_min, T_max, sigma, d_target, C):
+        super(Diff_GAN_Model, self).__init__()
         
         # Save the needed variables
         self.vocab = vocab
         self.vocab_inv = {vocab[i]:i for i in vocab.keys()}
         self.sequence_length = sequence_length
         self.batchSize = batchSize
-        self.trainingRatio = trainingRatio
-        self.decRatRate = decRatRate
-        self.Lambda = Lambda
+        self.n_D = n_D
         self.loadInEpoch = loadInEpoch
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         
@@ -100,6 +109,16 @@ class GAN_Model(nn.Module):
         self.genSaveFile = genSaveFile
         self.discSaveFile = discSaveFile
         self.trainGraphFile = trainGraphFile
+        self.TgraphFile = TgraphFile
+        
+        # Diffusion parameters
+        self.Beta_0 = Beta_0
+        self.Beta_T = Beta_T
+        self.T_min = T_min
+        self.T_max = T_max
+        self.sigma = sigma
+        self.d_target = d_target
+        self.C = C
 
         # Convert the device to a torch device
         if device.lower() == "fullgpu":
@@ -122,59 +141,38 @@ class GAN_Model(nn.Module):
         # The generator and discriminator models
         if self.dev != "cpu":
             self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
-            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "sigmoid", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
         else:
             self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
-            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "sigmoid", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
         
         # The optimizer for the model
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
         self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, betas=[Beta1, Beta2])
         
+        # Schedulers and distriutions turned into classes (others
+        # are functions)
+        self.variance_scheduler = linear_variance_scheduler(Beta_0, Beta_T, T_max)
         
-    def one_hot(a, num_classes):
-        return np.squeeze(np.eye(num_classes)[a.reshape(-1)])
+        # Setup T (diffusion timesteps) to be the minimum value
+        self.T = T_min
+        
+        # Setup the t_epl array
+        self.t_epl = np.zeros(64, dtype=np.float32)
+        self.t_epl[32:] = p_pie_sample(32, self.T)
     
     
-    # For WGAN-GP loss, we need a gradient penalty to add
-    # to the discriminator loss. This function gets that
-    # penalty
-    # Inputs:
-    #   x - A sample of real data
-    #   x_tilde - A sample of data from the generator
-    def get_gradient_penalty(self, x, x_tilde):
-        # So that NaN values aren't produced, make any numbers
-        # x_tilde that are exactly 1 or 0 slightly smaller or
-        # slightly larger
-        x_tilde = torch.where(x_tilde == 1.0, x_tilde-0.0001, x_tilde)
-        x_tilde = torch.where(x_tilde == 0.0, x_tilde+0.0001, x_tilde)
+    
+    # Update the model's diffusion paramters
+    def update_diffusion(self, D_real):
+        # Update the T equation using the T scheduler
+        self.T = T_scheduler(self.T, self.d_target, self.C, D_real)
         
-        # Get the device
-        device = self.device
-        if self.dev == "partgpu":
-            device = gpu
-
-        # Sample a uniform distribution to get a random number, epsilon
-        epsilon = torch.rand((self.batchSize, 1, 1), requires_grad=True, device=device)
-        epsilon = epsilon.expand(x.shape)
+        # Clip T between T_min and T_max
+        self.T = torch.clamp(self.T, self.T_min, self.T_max)
         
-        # Create a new tensor fo the same shape as the real and fake data
-        x_hat = epsilon*x + (1-epsilon)*x_tilde
-        x_hat = x_hat.detach().clone()
-        x_hat = torch.autograd.Variable(x_hat, requires_grad=True)
-        
-        # Send the transformed and combined data through the
-        # discriminator
-        disc_x_hat = self.discriminator(x_hat)
-        
-        # Get the gradients of the discriminator output
-        gradients = torch.autograd.grad(outputs=disc_x_hat, inputs=x_hat,
-                              grad_outputs=torch.ones(disc_x_hat.size(), device=device),
-                              create_graph=True, retain_graph=True, only_inputs=True)[0]
-        gradients = gradients.view(gradients.size(0), -1)
-        
-        # Get the final penalty and return it
-        return ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.Lambda
+        # Update the t_epl array
+        self.t_epl[32:] = p_pie_sample(32, self.T.cpu().detach())
     
     
     
@@ -183,7 +181,7 @@ class GAN_Model(nn.Module):
     #   X - A list of sentences to train the models on
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
-        # Encode the all the data if self.loadInEpoch is false
+        # Encode the sentences
         if self.loadInEpoch == False:
             X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device), dtype=object)
             s = X_orig_one_hot.shape[0]
@@ -197,6 +195,9 @@ class GAN_Model(nn.Module):
         self.discLoss_real = []
         self.discLoss_fake = []
         
+        # Save the T value over training
+        self.TVals = []
+        
         # Train the model for epochs number of epochs
         for epoch in range(1, epochs+1):
             # Model saving
@@ -207,112 +208,104 @@ class GAN_Model(nn.Module):
             # has left to see and the Generator has left to see
             disc_nums = torch.randperm(s, device=self.device)
             
-            # Train the discriminator first
+            # Step 1: Train the discriminator
             self.optim_disc.zero_grad()
-            for i in range(0, max(self.trainingRatio[1], 1)):
-                # Sample data for the discriminator
+            for i in range(0, max(self.n_D, 1)):
+                # Sample a batch of real data
                 disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
-
-                # Put the data on the correct device
-                if self.dev == "partgpu":
-                    disc_sub = disc_sub.to(gpu)
-                    disc_nums = disc_nums.to(gpu)
-                else:
-                    disc_sub = disc_sub.to(self.device)
-                    disc_nums = disc_nums.to(self.device)
                 
-                # Generate some data from the generator
+                # Get a batch of data from the generator
                 with torch.no_grad():
-                    Y = self.generator.forward_train()
-                
-                # Send the generated output through the discriminator
-                # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
-                
+                    x_g = self.generator.forward_train()
+                    
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:
                     # Load in more data until no more data is availble
                     # or the requested batch size is obtained
-                    real_X = np.array([])
-                    while real_X.shape[0] < self.batchSize or disc_nums.shape[0] == 0:
+                    x = np.array([])
+                    while x.shape[0] < self.batchSize or disc_nums.shape[0] == 0:
                         # Get more data if needed
                         disc_sub = disc_nums[:self.batchSize]
                         disc_nums = disc_nums[self.batchSize:]
                         
                         # Save the data
-                        if len(real_X) == 0:
-                            real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
+                        if len(x) == 0:
+                            x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
                         else:
-                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)[:self.batchSize-real_X.shape[0]]))
+                            x = np.concatenate((x, np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)[self.batchSize-x.shape[0]:]))
                     
                     # If disc_nums is empty, a problem occured
                     assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
                 else:
-                    real_X = X_orig_one_hot[disc_sub.cpu().numpy()]
+                    x = X_orig_one_hot[disc_sub.cpu().numpy()]
                 
-                # Add padding to the subset
-                real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
-                if self.dev == "partgpu":
-                    real_X = real_X.to(gpu)
+                # Get a batch of real data and add padding
+                # to it
+                if self.loadInEpoch == True:
+                    x = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()], self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
                 else:
-                    real_X = real_X.to(self.device)
-
-                # Get the gradient penalty
-                gradient_penalty = self.get_gradient_penalty(real_X, Y)
-
-                # We don't need the generated output anymore
-                del Y
+                    x = X_orig_one_hot[disc_sub.cpu().detach().numpy()]
+                x = addPadding_one_hot(x, self.vocab_inv, self.sequence_length)
+                if self.dev == "partgpu":
+                    x = x.to(gpu)
+                else:
+                    x = x.to(self.device)
                 
-                # Send the real output throuh the discriminator to
-                # get a batch of predictions on the real sentences
-                disc_real = torch.squeeze(self.discriminator(real_X)) # Predictions
+                # Sample a batch of t values from t_epl
+                t = torch.tensor(np.random.choice(self.t_epl, size=self.batchSize, replace=True))
+                
+                # Diffuse the real and fake data
+                y = y_sample(x.float(), self.sigma, self.variance_scheduler, t)
+                y_g = y_sample(x_g, self.sigma, self.variance_scheduler, t)
+                
+                # Delete the undiffused data
+                del x, x_g
+                
+                # Get the discriminator value on the real and fake data
+                disc_real = self.discriminator(y)
+                disc_fake = self.discriminator(y_g)
                 
                 # Get the discriminator loss
-                #discLoss = minimax_disc(disc_real, disc_fake)
-                discLoss = wasserstein_disc(disc_real, disc_fake)
+                # which we want to maximize
+                discLoss = -diff_disc(disc_real, disc_fake)
                 
-                discLoss_real, discLoss_fake = wasserstein_disc_split(disc_real, disc_fake)
-
-                # The cost of the discriminator is the loss + the penalty
-                discCost = discLoss + gradient_penalty
+                discLoss_real, discLoss_fake = diff_disc_split(disc_real, disc_fake)
                 
                 # Backpropogate the cost
-                discCost.backward()
+                discLoss.backward()
                 
                 # Step the optimizer
                 self.optim_disc.step()
                 self.optim_disc.zero_grad()
-
+                
+                discLoss *= -1
+                
                 # Delete all discriminator stuff as its no longer needed
-                del disc_sub, disc_fake, real_X, gradient_penalty, disc_real, discLoss
+                del disc_sub, disc_fake, y, y_g, t
             
-            # Train the generator next
+            
+            # Step 2: Train the generator
             self.optim_gen.zero_grad()
-            for i in range(0, max(self.trainingRatio[0], 1)):
+            for i in range(0, 1):
                 # Get subset indices of the data for the generator
                 # and discriminator
                 disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
-
-                # Put the data on the correct device
-                if self.dev == "partgpu":
-                    disc_sub = disc_sub.to(gpu)
-                    disc_nums = disc_nums.to(gpu)
-                else:
-                    disc_sub = disc_sub.to(self.device)
-                    disc_nums = disc_nums.to(self.device)
                 
-                # Generate some data from the generator
-                Y = self.generator.forward_train()
+                # Get a batch of data from the generator
+                x_g = self.generator.forward_train()
                 
-                # Send the generated output through the discriminator
-                # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y)) # Predictions
+                # Sample a batch of t values from t_epl
+                t = torch.tensor(np.random.choice(self.t_epl, size=self.batchSize, replace=True))
                 
-                # Get the generator loss
-                #genLoss = minimax_gen(disc_fake)
-                genLoss = wasserstein_gen(disc_fake)
+                # Diffuse the generated data
+                y_g = y_sample(x_g, self.sigma, self.variance_scheduler, t)
+                
+                # Get the discriminator value on the diffused data
+                disc_fake = self.discriminator(y_g)
+                
+                # Get the generator loss which we
+                # want to minimize
+                genLoss = diff_gen(disc_fake)
                 
                 # Backpropogate the loss
                 genLoss.backward()
@@ -320,25 +313,25 @@ class GAN_Model(nn.Module):
                 # Step the optimizer
                 self.optim_gen.step()
                 self.optim_gen.zero_grad()
-            
-                # Delete all generator stuff as its no longer needed
-                del disc_sub, disc_nums, disc_fake, Y
-            
-            
-            # Decrease the rate
-            if self.decRatRate > 0:
-                if epochs%self.decRatRate == 0 and self.decRatRate > 0:
-                    self.trainingRatio[0] -= 1
-                    self.trainingRatio[1] -= 1
                 
+                # Delete the variables that are no longer needed
+                del disc_sub, disc_nums, disc_fake, y_g, x_g, t
+            
+            # Step 3: Update the diffusion values every 4 steps
+            if epoch % 4 == 0:
+                self.update_diffusion(disc_real.cpu().detach())
+            
+            # Save the T value
+            self.TVals.append(self.T)
+            
+            
             # Save the loss values
             self.genLoss.append(genLoss.item())
-            self.discLoss.append(discCost.item())
+            self.discLoss.append(discLoss.item())
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discCost.item(), 4)}\n")
-    
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Loss Real: {round(discLoss_real.item(), 4)}     Discriminator Loss Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    T: {self.T}\n")
     
     
     
@@ -357,6 +350,7 @@ class GAN_Model(nn.Module):
             self.discriminator.saveModel(saveDir, discFile)
             
             if self.trainGraphFile:
+                # Training graph
                 fix, ax = plt.subplots()
                 y = [i for i in range(1, len(self.genLoss)+1)]
                 ax.plot(y, self.genLoss, label="Gen loss")
@@ -368,6 +362,17 @@ class GAN_Model(nn.Module):
                 ax.set_ylabel("Loss")
                 ax.legend()
                 plt.savefig(self.saveDir + os.sep + self.trainGraphFile)
+                plt.close()
+                
+                # T graph
+                fix, ax = plt.subplots()
+                y = [i for i in range(1, len(self.genLoss)+1)]
+                ax.plot(y, self.TVals, label="T Values")
+                ax.set_title("T values over epochs")
+                ax.set_xlabel("Epochs")
+                ax.set_ylabel("T value")
+                ax.legend()
+                plt.savefig(self.saveDir + os.sep + self.TgraphFile)
                 plt.close()
     
     # Load the models

@@ -1,5 +1,5 @@
 from torch import nn
-from blocks.MHA import MHA
+from ..blocks.MHA import MHA
 
 
 

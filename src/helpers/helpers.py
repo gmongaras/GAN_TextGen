@@ -6,13 +6,20 @@ from nltk.tokenize import word_tokenize
 
 def loadVocab(vocab_file):
     vocab = {}
-    vocabFile = open(vocab_file, "r")
+    vocabFile = open(vocab_file, "r", encoding="utf-8")
     for line in vocabFile:
+        # If the line is empty, skip it
+        if len(line) < 2:
+            continue
+        
         # Clean the line
-        line = line.strip()
+        if not line[2].isspace():
+            line = line.strip()
+        else:
+            line = line[:3]
         
         # Get the key and value
-        line = line.split(',')
+        line = line.split(',', 1)
         
         # Add to the vocab
         vocab[int(line[0])] = line[1]
@@ -191,7 +198,7 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
             continue
         
         # Turn the encoded words into a list and save it
-        encoded.append(torch.stack(enc_words).detach().to(device))
+        encoded.append(torch.stack(enc_words).detach().to(device).to(torch.bool))
         
         if deleteOrig == True:
             del X[i]
