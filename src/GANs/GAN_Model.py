@@ -16,6 +16,8 @@ from .models.losses import categorical_cross_entropy_loss
 
 from .models.Generator import Generator
 from .models.Discriminator import Discriminator
+from .models.Teacher import Teacher
+
 import torch
 from torch import nn
 import numpy as np
@@ -97,6 +99,7 @@ class GAN_Model(nn.Module):
         self.Lambda_n = Lambda_n
         self.HideAfterEnd = HideAfterEnd
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
+        self.embedding_size_disc = embedding_size_disc
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -126,17 +129,20 @@ class GAN_Model(nn.Module):
         self.device = device
         self.dev = dev
         
-        # The generator and discriminator models
+        # The generator, discriminator, and teacher models
         if self.dev != "cpu":
             self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
             self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, gpu)
+            self.teacher = Teacher(self.batchSize, len(self.vocab), self.embedding_size_disc, self.sequence_length, num_heads, gpu)
         else:
             self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
             self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, num_heads, pooling, embed_mode_disc, device)
+            self.teacher = Teacher(self.batchSize, len(self.vocab), self.embedding_size_disc, self.sequence_length, num_heads, device)
         
-        # The optimizer for the model
+        # The optimizer for the models
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
         self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, betas=[Beta1, Beta2])
+        self.optim_teach = torch.optim.Adam(self.teacher.parameters())
         
         
     def one_hot(a, num_classes):
@@ -223,6 +229,9 @@ class GAN_Model(nn.Module):
     #   X - A list of sentences to train the models on
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
+        # Save the sentence lengths
+        lens_labels = torch.tensor([len(i.split(" ")) for i in X], dtype=torch.int8, device=self.device, requires_grad=False)
+
         # Encode the all the data if self.loadInEpoch is false
         if self.loadInEpoch == False:
             X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device), dtype=object)
@@ -278,9 +287,15 @@ class GAN_Model(nn.Module):
                 if self.HideAfterEnd:
                     masks = self.getMasks(Y)
                 
+                # Get the length predictions for the output
+                lens = torch.argmax(self.teacher(torch.argmax(Y, dim=-1)), dim=-1)
+                
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y, masks))
+                disc_fake = []
+                for i in range(0, Y.shape[0]):
+                    disc_fake.append(torch.squeeze(self.discriminator(Y[i:i+1, :lens[i]], masks)))
+                disc_fake = torch.stack(disc_fake)
                 
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:
@@ -319,10 +334,17 @@ class GAN_Model(nn.Module):
                 # Get masks for the real data
                 if self.HideAfterEnd:
                     masks = self.getMasks(real_X)
+
+                # Get the length predictions for the real data
+                lens = self.teacher(torch.argmax(real_X, dim=-1))
+                lens_argmax = torch.argmax(lens, dim=-1)
                 
-                # Send the real output through the discriminator to
-                # get a batch of predictions on the real sentences
-                disc_real = torch.squeeze(self.discriminator(real_X, masks))
+                # Send the generated output through the discriminator
+                # to get a batch of predictions on the real sentences
+                disc_real = []
+                for i in range(0, real_X.shape[0]):
+                    disc_real.append(torch.squeeze(self.discriminator(real_X[i:i+1, :lens_argmax[i]], masks)))
+                disc_real = torch.stack(disc_real)
                 
                 # Get the discriminator loss
                 #discLoss = minimax_disc(disc_real, disc_fake)
@@ -340,9 +362,20 @@ class GAN_Model(nn.Module):
                 self.optim_disc.step()
                 self.optim_disc.zero_grad()
 
+                # Get the teacher loss
+                lens_labels_sub = lens_labels[disc_sub].long().to(self.device if self.dev != "partgpu" else gpu)
+                teachLoss = nn.CrossEntropyLoss()(lens, lens_labels_sub)
+
+                # Train the teacher
+                teachLoss.backward()
+                
+                # Step the optimizer
+                self.optim_teach.step()
+                self.optim_teach.zero_grad()
+
                 # Delete all discriminator stuff as its no longer needed
                 gradient_penalty = gradient_penalty.cpu().detach().item()
-                del disc_sub, disc_fake, real_X, disc_real
+                del disc_sub, disc_fake, real_X, disc_real, lens_argmax, lens
             
             # Train the generator next
             self.optim_gen.zero_grad()
@@ -366,10 +399,16 @@ class GAN_Model(nn.Module):
                 # Generate masks for the fake data
                 if self.HideAfterEnd:
                     masks = self.getMasks(Y)
+
+                # Get the length predictions for the output
+                lens = torch.argmax(self.teacher(torch.argmax(Y, dim=-1)), dim=-1)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y, masks))
+                disc_fake = []
+                for i in range(0, Y.shape[0]):
+                    disc_fake.append(torch.squeeze(self.discriminator(Y[i:i+1, :lens[i]], masks)))
+                disc_fake = torch.stack(disc_fake)
                 
                 # Get the generator loss
                 #genLoss = minimax_gen(disc_fake)
@@ -384,7 +423,7 @@ class GAN_Model(nn.Module):
                 self.optim_gen.zero_grad()
             
                 # Delete all generator stuff as its no longer needed
-                del disc_sub, disc_fake, Y
+                del disc_sub, disc_fake, Y, lens
 
             
             # Dynamic n updates:
@@ -409,7 +448,7 @@ class GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}    Teacher: {round(teachLoss.item(), 4)}", end="")
             if self.dynamic_n:
                 print(f"    r_g: {round(r_g, 4)}    r_d: {round(r_d, 4)}", end="")
             print()

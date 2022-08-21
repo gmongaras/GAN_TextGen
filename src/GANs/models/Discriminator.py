@@ -1,5 +1,4 @@
 from ..blocks.discBlock import discBlock
-from ..blocks.inTrans import inTrans
 from torch import nn
 import torch
 import os
@@ -45,8 +44,8 @@ class Discriminator(nn.Module):
         blocks = [discBlock(T, embedding_size, num_heads, pooling) for i in range(B)]
         self.discBlocks = nn.Sequential(*blocks).to(device)
         
-        # Create the class token which will be a vector of 0.5s
-        self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)/2
+        # Create the class token which will be a tensor of 1s
+        self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)
         
         # Output MHA blocks
         self.outEmb = nn.ModuleList([MHAwithNorm(embedding_size, embedding_size, embedding_size, num_heads) for i in range(O)]).to(device)
@@ -83,7 +82,7 @@ class Discriminator(nn.Module):
             X = self.discBlocks(X)
         
         # Add the class token to the output of the blocks
-        X = torch.cat((self.clsTok, X), dim=1)
+        X = torch.cat((self.clsTok[:X.shape[0]], X), dim=1)
         
         # Send the output through some MHA blocks
         for O in self.outEmb:
