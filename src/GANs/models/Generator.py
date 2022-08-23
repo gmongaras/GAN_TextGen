@@ -78,6 +78,15 @@ class Generator(nn.Module):
 
         # Normal distribution for the model
         self.normDist = torch.distributions.normal.Normal(0, 1)
+
+        # <LEN> token for the model
+        self.lenTok = torch.ones((self.batchSize, 1, embedding_size), device=device, dtype=torch.float32, requires_grad=False)
+
+        # Linear layer used to decode the lengths
+        self.lensDec = nn.Sequential(
+            nn.Linear(embedding_size, self.sequence_length, device=device),
+            nn.Softmax(dim=-1),
+        )
     
     
     
@@ -150,11 +159,6 @@ class Generator(nn.Module):
             # Get the argmax of the output tokens
             out_tok = torch.argmax(out_tok_soft, dim=-1)
             
-            # Save the softmax output
-            #for i in range(self.batchSize):
-            #    out_sent[i].append(out_tok_soft[i])
-            #    #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
-            
             # Save the tokenized new word
             for i in range(len(out_sent)):
                 out_sent[i].append(out_tok[i])
@@ -172,13 +176,41 @@ class Generator(nn.Module):
                 seeds = self.normDist.sample((w.shape[0], 1, self.embedding_size)).float().to(self.device)
                 Y = torch.cat((Y, seeds), dim=1) # Add the seeds
                 Y[:, tok+1] += posEnc[:, tok+1] # Add positional encodings to the seed token
-        
+
         # Turn the output into a tensor
-        #out_sent = [torch.stack(sent) for sent in out_sent]
-        #out_sent = torch.stack(out_sent)
+        out_sent = [torch.stack(sent) for sent in out_sent]
+        out_sent = torch.stack(out_sent)
+
+
+        ## Feed the whole output into the generator.
+        ## Note: We are using the output with an attached graph
+        ## so that each outputted word is effected by the
+        ## gradient of the length token.
+
+        # Add the <LEN> token to the end of the sequence
+        Y = torch.cat((Y, self.lenTok.clone()[0:1]), dim=1)
+
+        # Send the input through the transformer blocks
+        # without adding any noise
+        lens = Y
+        for block in self.transBlocks:
+            lens = block(lens, lens)
+            
+        # Send the input through the output MHA blocks
+        for block in self.outEmb:
+            lens = block(lens, lens)
+            
+        # Get the encoded lengths from the output
+        lens = lens[:, -1]
+
+        # Decode the lengths
+        lens = self.lensDec(lens)
+
+        # Clamp the lengths between 1 and S
+        # lens = torch.clamp(lens, 1, self.sequence_length)
         
         # Return the output
-        return torch.stack(out_sent[0])
+        return out_sent.squeeze(), lens.squeeze()
 
     
     
@@ -362,9 +394,39 @@ class Generator(nn.Module):
         # Turn the output into a tensor
         out_sent = [torch.stack(sent) for sent in out_sent]
         out_sent = torch.stack(out_sent)
+
+
+
+        ## Feed the whole output into the generator.
+        ## Note: We are using the output with an attached graph
+        ## so that each outputted word is effected by the
+        ## gradient of the length token.
+
+        # Add the <LEN> token to the end of the sequences
+        Y = torch.cat((Y, self.lenTok.clone()), dim=1)
+
+        # Send the input through the transformer blocks
+        # without adding any noise
+        lens = Y
+        for block in self.transBlocks:
+            lens = block(lens, lens)
+            
+        # Send the input through the output MHA blocks
+        for block in self.outEmb:
+            lens = block(lens, lens)
+            
+        # Get the encoded lengths from the output
+        lens = lens[:, -1]
+
+        # Decode the lengths
+        lens = self.lensDec(lens)
+
+        # Clamp the lengths between 1 and S
+        lens = torch.clamp(lens, 1, self.sequence_length)
+
         
         # Return the output
-        return out_sent
+        return out_sent, lens
     
     
     # Forward train using normal custom embeddings

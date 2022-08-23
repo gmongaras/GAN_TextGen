@@ -25,7 +25,7 @@ class Discriminator(nn.Module):
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   embed_mode - The embedding mode to be used ("fc" or "pca")
     #   device - Device to put the model on
-    def __init__(self, T, B, O, outMode, batchSize, vocab_size, embedding_size, num_heads, pooling, embed_mode, device):
+    def __init__(self, T, B, O, outMode, batchSize, vocab_size, embedding_size, sequence_length, num_heads, pooling, embed_mode, device):
         super(Discriminator, self).__init__()
 
         self.device = device
@@ -54,6 +54,9 @@ class Discriminator(nn.Module):
         self.out_FC = nn.Linear(embedding_size, 1, device=device)
         self.Tanh = nn.Tanh().to(device)
         self.Sigmoid = nn.Sigmoid().to(device)
+
+        # Linear layer used to encode the lengths
+        self.lensEnc = nn.Linear(sequence_length, embedding_size, device=device)
     
     
     
@@ -65,13 +68,19 @@ class Discriminator(nn.Module):
     # Output
     #   2-D tensor of shape (N, 1) where each value is the
     #   prediction on how real the input is between -1 and 1
-    def forward(self, X, masks=None):
+    def forward(self, X, lens, masks=None):
         # Apply the encoding transformation to get the embeddings
         # to the desired embedding size
         if self.embed_mode == "pca":
             X = torch.pca_lowrank(X, self.embedding_size)[0]
         else:
             X = self.encodingTransform(X)
+
+        # Encode the lengths from shape S to E
+        lens = self.lensEnc(lens)
+
+        # Append the lengths to the beginning of the inputs
+        X = torch.cat((lens.unsqueeze(1), X), dim=1)
         
         # Send the input through the discriminator blocks
         if masks != None:

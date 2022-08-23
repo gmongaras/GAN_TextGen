@@ -177,16 +177,20 @@ def train(
     
     
     ### Training The Model ###
-    #model.loadModels("models", "gen_model - 9500.pkl", "disc_model - 100.pkl")
+    #model.loadModels("models", "gen_model - 7000.pkl", "disc_model - 1000.pkl")
     model.train_model(sentences, epochs)
     print()
     
     
     ### Model Saving and Predictions ###
-    noise = torch.rand((sequence_length), requires_grad=False)
-    out = model.generator(noise)
-    for i in out:
+    with torch.no_grad():
+        noise = torch.rand((sequence_length), requires_grad=False)
+        out, lens = model.generator(noise)
+    lens = torch.argmax(lens, dim=-1)
+    for i in out[:lens.long().item()]:
         print(vocab[i.item()], end=" ")
+    print()
+    print(f"lens: {lens}")
     
     
 if __name__ == "__main__": 
