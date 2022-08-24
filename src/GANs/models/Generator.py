@@ -2,6 +2,7 @@ from torch import nn
 import torch
 import os
 from ..blocks.outTrans import outTrans
+from ..blocks.inTrans import inTrans
 from ..blocks.PositionalEncoding import PositionalEncoding
 from ..blocks.CustomEmb import CustomEmb
 from ..blocks.MHA import MHA
@@ -51,10 +52,10 @@ class Generator(nn.Module):
         self.inEmb2 = nn.Sequential(*modules).to(device)
         
         # Transformer blocks
-        self.transBlocks = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, embedding_size, device) for i in range(B)]).to(device)
+        self.transBlocks = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, device, 512) for i in range(B)]).to(device)
         
         # Output embedding MHA blocks
-        self.outEmb = nn.ModuleList([MHAwithNorm(embedding_size, embedding_size, embedding_size, num_heads) for i in range(O)]).to(device)
+        self.outEmb = nn.ModuleList([inTrans(embedding_size, num_heads, 512) for i in range(O)]).to(device)
         
         # If the embed_mode is "custom", use the custom embedding mode
         if embed_mode == "custom":
@@ -143,12 +144,12 @@ class Generator(nn.Module):
         for tok in range(1, self.sequence_length):
             # Send the input through the tranformer blocks
             output = Y.clone()
-            for block in self.outEmb:
+            for block in self.transBlocks:
                 output = block(w[:, 0:Y.shape[1]], output)
                 
             # Send the input through the output MHA blocks
             for block in self.outEmb:
-                output = block(output, output)
+                output = block(output)
                 
             # Get the token from the output
             out_tok = output[:, tok]
@@ -198,7 +199,7 @@ class Generator(nn.Module):
             
         # Send the input through the output MHA blocks
         for block in self.outEmb:
-            lens = block(lens, lens)
+            lens = block(lens)
             
         # Get the encoded lengths from the output
         lens = lens[:, -1]
@@ -355,7 +356,7 @@ class Generator(nn.Module):
                 
             # Send the input through the output MHA blocks
             for block in self.outEmb:
-                output = block(output, output)
+                output = block(output)
                 
             # Get the token from the output
             out_tok_b = output[:, tok]
@@ -413,7 +414,7 @@ class Generator(nn.Module):
             
         # Send the input through the output MHA blocks
         for block in self.outEmb:
-            lens = block(lens, lens)
+            lens = block(lens)
             
         # Get the encoded lengths from the output
         lens = lens[:, -1]
@@ -421,8 +422,11 @@ class Generator(nn.Module):
         # Decode the lengths
         lens = self.lensDec(lens)
 
-        # Clamp the lengths between 1 and S
-        lens = torch.clamp(lens, 1, self.sequence_length)
+        # For each length, replace the values with PAD tokens
+        pad_tok = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
+        pad_tok = pad_tok.float().to(self.device)
+        for i in range(0, lens.shape[0]):
+            out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] = pad_tok.clone()
 
         
         # Return the output

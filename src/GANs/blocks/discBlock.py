@@ -16,7 +16,7 @@ class discBlock(nn.Module):
         super(discBlock, self).__init__()
         
         # The transformer blocks
-        self.trans = [inTrans(embedding_size, num_heads, embedding_size) for i in range(T)]
+        self.trans = [inTrans(embedding_size, num_heads, 512) for i in range(T)]
         self.trans = nn.Sequential(*self.trans)
         
         # Average pooling layer to

@@ -285,19 +285,19 @@ class GAN_Model(nn.Module):
                 # Generate masks for the lengths
                 # Masks are of shape (N, S) where each element is a 1 or 0.
                 # 0 indicates no masking. 1 indicates a masking position.
-                lens_fake_argmax = torch.argmax(lens_fake, dim=-1)
-                masks = torch.zeros(Y.shape[0], Y.shape[1]+1, device=self.device, requires_grad=False)
-                for i in range(0, Y.shape[0]):
-                    # +1 since the lengths are going to be appended to the beginning of the
-                    # sequence and should not be masked
-                    masks[i, lens_fake_argmax[i].long().item()+1:] = 1
-                masks = masks.to(torch.bool)
-                if self.dev == "partgpu":
-                    masks = masks.to(gpu)
+                # lens_fake_argmax = torch.argmax(lens_fake, dim=-1)
+                # masks = torch.zeros(Y.shape[0], Y.shape[1]+1, device=self.device, requires_grad=False)
+                # for i in range(0, Y.shape[0]):
+                #     # +1 since the lengths are going to be appended to the beginning of the
+                #     # sequence and should not be masked
+                #     masks[i, lens_fake_argmax[i].long().item()+1:] = 1
+                # masks = masks.to(torch.bool)
+                # if self.dev == "partgpu":
+                #     masks = masks.to(gpu)
                 
-                # Generate masks for the fake data
-                if self.HideAfterEnd:
-                    masks = self.getMasks(Y)
+                # # Generate masks for the fake data
+                # if self.HideAfterEnd:
+                #     masks = self.getMasks(Y)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
@@ -332,7 +332,8 @@ class GAN_Model(nn.Module):
                     real_X = real_X.to(self.device)
 
                 # Get the real data masks and lengths
-                masks, lens_real = self.getMasks(real_X)
+                # masks, lens_real = self.getMasks(real_X)
+                _, lens_real = self.getMasks(real_X)
 
                 # One hot encode the lengths
                 lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length)
@@ -390,15 +391,15 @@ class GAN_Model(nn.Module):
                 # Generate masks for the lengths
                 # Masks are of shape (N, S) where each element is a 1 or 0.
                 # 0 indicates no masking. 1 indicates a masking position.
-                lens_fake_argmax = torch.argmax(lens_fake, dim=-1)
-                masks = torch.zeros(Y.shape[0], Y.shape[1]+1, device=self.device, requires_grad=False)
-                for i in range(0, Y.shape[0]):
-                    # +1 since the lengths are going to be appended to the beginning of the
-                    # sequence and should not be masked
-                    masks[i, lens_fake_argmax[i].long().item()+1:] = 1
-                masks = masks.to(torch.bool)
-                if self.dev == "partgpu":
-                    masks = masks.to(gpu)
+                # lens_fake_argmax = torch.argmax(lens_fake, dim=-1)
+                # masks = torch.zeros(Y.shape[0], Y.shape[1]+1, device=self.device, requires_grad=False)
+                # for i in range(0, Y.shape[0]):
+                #     # +1 since the lengths are going to be appended to the beginning of the
+                #     # sequence and should not be masked
+                #     masks[i, lens_fake_argmax[i].long().item()+1:] = 1
+                # masks = masks.to(torch.bool)
+                # if self.dev == "partgpu":
+                #     masks = masks.to(gpu)
                 
                 # Generate masks for the fake data
                 if self.HideAfterEnd:

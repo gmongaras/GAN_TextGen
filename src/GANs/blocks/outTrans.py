@@ -16,29 +16,29 @@ class outTrans(nn.Module):
     #   gausNoise - True to add pure gaussian noise in the B output blocks,
     #               False to not add gaussian noise
     #   num_heads - Number of heads in each MHA block
-    #   FF_embedding - embedding size of the output of the
-    #                  Feed-forward block
     #   device - Device to put tensors on
-    def __init__(self, E_1, E_2, gausNoise, num_heads, FF_embedding, device):
+    #   hidden_size - Hidden size of the linear layer
+    def __init__(self, E_1, E_2, gausNoise, num_heads, device, hidden_size=512):
         super(outTrans, self).__init__()
         self.device = device
         self.gausNoise = gausNoise
         
         # The first MHA module with a mask
-        self.MHA1 = MHA(E_2, E_2, E_2, num_heads, True).to(device)
+        self.MHA1 = MHA(E_2, E_2, E_2, num_heads).to(device)
         
         # Second MHA module without a mask and with an
         # input from a different source
         self.MHA2 = MHA(E_1, E_2, E_2, num_heads).to(device)
         
         # Feed-foward block after the MHA blocks
-        self.FF = nn.Linear(E_2, FF_embedding, device=device)
-        self.ReLU = nn.SiLU()
+        self.FF1 = nn.Linear(E_2, hidden_size, device=device)
+        self.Act = nn.GELU()
+        self.FF2 = nn.Linear(hidden_size, E_2, device=device)
         
         # Layer normalization blocks
         self.LN1 = nn.LayerNorm(E_2, device=device)
         self.LN2 = nn.LayerNorm(E_2, device=device)
-        self.LN3 = nn.LayerNorm(FF_embedding, device=device)
+        self.LN3 = nn.LayerNorm(E_2, device=device)
     
     
     # Input:
@@ -49,7 +49,7 @@ class outTrans(nn.Module):
     def forward(self, X_1, X_2):
         X = self.MHA1(X_2, X_2)
         X += X_2
-        X = self.LN1(X.contiguous())
+        X = self.LN1(X)
         
         # Add gaussian noise if set to true
         if self.gausNoise:
@@ -58,11 +58,12 @@ class outTrans(nn.Module):
         X_saved = X.clone()
         X = self.MHA2(X_1, X)
         X += X_saved
-        X = self.LN2(X.contiguous())
+        X = self.LN2(X)
         
         X_saved = X.clone()
-        X = self.FF(X)
-        X = self.ReLU(X) + 0
+        X = self.FF1(X)
+        X = self.Act(X) + 0
+        X = self.FF2(X)
         X += X_saved
-        X = self.LN3(X.contiguous())
+        X = self.LN3(X)
         return X

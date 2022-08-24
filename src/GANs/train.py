@@ -55,7 +55,7 @@ from typing import Optional
 @click.option("--device", "device", type=str, default="partgpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
 @click.option("--epochs", "epochs", type=int, default=300000, help="Number of epochs to train the model", required=False)
 @click.option("--n_D", "n_D", type=int, default=5, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
-@click.option("--saveSteps", "saveSteps", type=int, default=1000, help="Number of steps until the model is saved", required=False)
+@click.option("--saveSteps", "saveSteps", type=int, default=100, help="Number of steps until the model is saved", required=False)
 @click.option("--loadInEpoch", "loadInEpoch", type=bool, default=False, help="Should the data be loaded in as needed instead of before training? (True if so, False to load before training)", required=False)
 @click.option("--delWhenLoaded", "delWhenLoaded", type=bool, default=True, help="Delete the data as it's loaded in to free allocated memory? Note: This is automatically False if loadInEpoch is True", required=False)
 
@@ -177,7 +177,7 @@ def train(
     
     
     ### Training The Model ###
-    #model.loadModels("models", "gen_model - 7000.pkl", "disc_model - 1000.pkl")
+    #model.loadModels("models", "gen_model - 3000.pkl", "disc_model - 3000.pkl")
     model.train_model(sentences, epochs)
     print()
     
