@@ -97,7 +97,7 @@ class Discriminator(nn.Module):
         # Append the lengths to the beginning of the inputs
         X = torch.cat((lens.unsqueeze(1), X), dim=1)
         
-        # Send the input through the discriminator blocks
+        # Send the input through the backbone
         if masks != None:
             X = self.disc_backbone[0](X, masks)
             for b in self.disc_backbone[1:]:
@@ -105,7 +105,7 @@ class Discriminator(nn.Module):
         else:
             X = self.disc_backbone(X)
         
-        # Add the class token to the output of the blocks
+        # Add the class token to the output of the backbone
         X = torch.cat((self.clsTok[:X.shape[0]], X), dim=1)
         
         # Get the predictions for the length
@@ -113,8 +113,8 @@ class Discriminator(nn.Module):
         Y_len = self.disc_head_lens_L(Y_len)
         
         # Get the predictions for the sentences
-        Y_sent = self.disc_head_lens_B(X)[:, 0]
-        Y_sent = self.disc_head_lens_L(Y_sent)
+        Y_sent = self.disc_head_sent_B(X)[:, 0]
+        Y_sent = self.disc_head_sent_L(Y_sent)
         
         # Apply the optional activation
         if self.outMode == "sigmoid":
