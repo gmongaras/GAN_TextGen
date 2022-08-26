@@ -39,10 +39,25 @@ class Discriminator(nn.Module):
         if self.embed_mode != "pca":
             self.encodingTransform = nn.Linear(vocab_size, embedding_size, device=device)
         
-        # Create the discriminator blocks. Note, each
+        # Create the discriminator backbone. Note, each
         # block halves the sequence length if pooling is used
+        # (NxS+1xE) -> (NxLxE)
         blocks = [discBlock(T, embedding_size, num_heads, pooling) for i in range(B)]
-        self.discBlocks = nn.Sequential(*blocks).to(device)
+        self.disc_backbone = nn.Sequential(*blocks).to(device)
+        
+        # The discriminator sentence classifier head for sentences
+        # (NxL+1xE) -> (N)
+        self.disc_head_sent_B = nn.Sequential(*[
+            discBlock(T, embedding_size, num_heads, "none") for i in range(0, O)
+        ]).to(device)
+        self.disc_head_sent_L = nn.Linear(embedding_size, 1, device=device)
+        
+        # The discriminator lens classifier head for sentences
+        # (NxL+1xE) -> (N)
+        self.disc_head_lens_B = nn.Sequential(*[
+            discBlock(T, embedding_size, num_heads, "none") for i in range(0, O)
+        ]).to(device)
+        self.disc_head_lens_L = nn.Linear(embedding_size, 1, device=device)
         
         # Create the class token which will be a tensor of 1s
         self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)
@@ -84,32 +99,32 @@ class Discriminator(nn.Module):
         
         # Send the input through the discriminator blocks
         if masks != None:
-            X = self.discBlocks[0](X, masks)
-            for b in self.discBlocks[1:]:
+            X = self.disc_backbone[0](X, masks)
+            for b in self.disc_backbone[1:]:
                 X = b(X)
         else:
-            X = self.discBlocks(X)
+            X = self.disc_backbone(X)
         
         # Add the class token to the output of the blocks
         X = torch.cat((self.clsTok[:X.shape[0]], X), dim=1)
         
-        # Send the output through some MHA blocks
-        for O in self.outEmb:
-            X = O(X, X)
+        # Get the predictions for the length
+        Y_len = self.disc_head_lens_B(X)[:, 0]
+        Y_len = self.disc_head_lens_L(Y_len)
         
-        # Get the class token from the sequence for each
-        # batch sequence
-        X = X[:, 0]
+        # Get the predictions for the sentences
+        Y_sent = self.disc_head_lens_B(X)[:, 0]
+        Y_sent = self.disc_head_lens_L(Y_sent)
         
-        # Send the token through the FC layer and
-        # an optional activation
-        X = self.out_FC(X)
+        # Apply the optional activation
         if self.outMode == "sigmoid":
-            X = self.Sigmoid(X)
+            Y_len = self.Sigmoid(Y_len)
+            Y_sent = self.Sigmoid(Y_sent)
         elif self.outMode == "tanh":
-            X = self.Tanh(X)
+            Y_len = self.Tanh(Y_len)
+            Y_sent = self.Tanh(Y_sent)
         
-        return X
+        return Y_sent.squeeze(), Y_len.squeeze()
     
     
     

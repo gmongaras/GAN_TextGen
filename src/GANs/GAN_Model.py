@@ -173,11 +173,11 @@ class GAN_Model(nn.Module):
         
         # Send the transformed and combined data through the
         # discriminator
-        disc_x_hat = self.discriminator(x_hat, lens_hat)
+        disc_sent, disc_lens = self.discriminator(x_hat, lens_hat)
         
         # Get the gradients of the discriminator output
-        gradients = torch.autograd.grad(outputs=disc_x_hat, inputs=(x_hat, lens_hat),
-                              grad_outputs=torch.ones(disc_x_hat.size(), device=device),
+        gradients = torch.autograd.grad(outputs=(disc_sent, disc_lens), inputs=(x_hat, lens_hat),
+                              grad_outputs=(torch.ones(disc_sent.size(), device=device), torch.ones(disc_lens.size(), device=device)),
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
         gradients = gradients.view(gradients.size(0), -1)
         
@@ -301,7 +301,7 @@ class GAN_Model(nn.Module):
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y, lens_fake, masks))
+                disc_fake_sent, disc_fake_lens = self.discriminator(Y, lens_fake, masks)
                 
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:
@@ -346,15 +346,16 @@ class GAN_Model(nn.Module):
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences
-                disc_real = torch.squeeze(self.discriminator(real_X, lens_real.float(), masks))
+                disc_real_sent, disc_real_lens = self.discriminator(real_X, lens_real.float(), masks)
                 
                 # Get the discriminator loss
-                #discLoss = minimax_disc(disc_real, disc_fake)
-                discLoss = wasserstein_disc(disc_real, disc_fake)
+                Loss_sent = wasserstein_disc(disc_real_sent, disc_fake_sent)
+                Loss_lens = wasserstein_disc(disc_real_lens, disc_fake_lens)
                 
-                discLoss_fake, discLoss_real = wasserstein_disc_split(disc_real, disc_fake)
+                discLoss_fake, discLoss_real = wasserstein_disc_split(disc_real_sent, disc_fake_sent)
 
                 # The cost of the discriminator is the loss + the penalty
+                discLoss = Loss_sent + self.batchSize*Loss_lens
                 discCost = discLoss + gradient_penalty
                 
                 # Backpropogate the cost
@@ -366,7 +367,7 @@ class GAN_Model(nn.Module):
 
                 # Delete all discriminator stuff as its no longer needed
                 gradient_penalty = gradient_penalty.cpu().detach().item()
-                del disc_sub, disc_fake, real_X, disc_real, lens_real, lens_fake
+                del disc_sub, real_X, lens_real, lens_fake
             
             # Train the generator next
             self.optim_gen.zero_grad()
@@ -407,11 +408,13 @@ class GAN_Model(nn.Module):
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = torch.squeeze(self.discriminator(Y, lens_fake, masks))
+                disc_fake_sent, disc_fake_lens = self.discriminator(Y, lens_fake, masks)
                 
                 # Get the generator loss
                 #genLoss = minimax_gen(disc_fake)
-                genLoss = wasserstein_gen(disc_fake)
+                Loss_sent = wasserstein_gen(disc_fake_sent)
+                Loss_lens = wasserstein_gen(disc_fake_lens)
+                genLoss = Loss_sent + self.batchSize*Loss_lens
 
                 
                 # Backpropogate the loss
@@ -422,7 +425,7 @@ class GAN_Model(nn.Module):
                 self.optim_gen.zero_grad()
             
                 # Delete all generator stuff as its no longer needed
-                del disc_sub, disc_fake, Y, lens_fake
+                del disc_sub, Y, lens_fake
 
             
             # Dynamic n updates:

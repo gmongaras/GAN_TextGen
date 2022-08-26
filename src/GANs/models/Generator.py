@@ -83,11 +83,15 @@ class Generator(nn.Module):
         # <LEN> token for the model
         self.lenTok = torch.ones((self.batchSize, 1, embedding_size), device=device, dtype=torch.float32, requires_grad=False)
 
+        # Model used to predict the legths of the model
+        self.lenGen = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, device, 512) for i in range(2)]).to(device)
+
         # Linear layer used to decode the lengths
-        self.lensDec = nn.Sequential(
-            nn.Linear(embedding_size, self.sequence_length, device=device),
+        self.lensDec_E = nn.Linear(embedding_size, 1, device=device)
+        self.lensDec_S = nn.Sequential(
+            nn.Linear(sequence_length, self.sequence_length, device=device),
             nn.Softmax(dim=-1),
-        )
+        ).to(device)
     
     
     
@@ -403,24 +407,14 @@ class Generator(nn.Module):
         ## so that each outputted word is effected by the
         ## gradient of the length token.
 
-        # Add the <LEN> token to the end of the sequences
-        Y = torch.cat((Y, self.lenTok.clone()), dim=1)
-
-        # Send the input through the transformer blocks
-        # without adding any noise
+        # Get the length estimation from the second model
         lens = Y
-        for block in self.transBlocks:
+        for block in self.lenGen:
             lens = block(lens, lens)
-            
-        # Send the input through the output MHA blocks
-        for block in self.outEmb:
-            lens = block(lens)
-            
-        # Get the encoded lengths from the output
-        lens = lens[:, -1]
 
         # Decode the lengths
-        lens = self.lensDec(lens)
+        lens = self.lensDec_E(lens).squeeze()
+        lens = self.lensDec_S(lens)
 
         # For each length, replace the values with PAD tokens
         pad_tok = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
