@@ -1,4 +1,3 @@
-import imp
 import torch
 from torch import nn
 from ..blocks.MHA import MHA

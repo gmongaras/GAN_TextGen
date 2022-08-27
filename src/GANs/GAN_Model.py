@@ -161,7 +161,7 @@ class GAN_Model(nn.Module):
         epsilon = torch.rand((self.batchSize, 1, 1), requires_grad=True, device=device)
         
         # Create a new tensor fo the same shape as the real and fake data
-        lens_hat = epsilon.squeeze()*lens_real + (1-epsilon.squeeze())*lens_fake.squeeze()
+        lens_hat = epsilon.squeeze(-1)*lens_real + (1-epsilon.squeeze(-1))*lens_fake.squeeze()
         epsilon = epsilon.expand(x.shape)
         x_hat = epsilon*x + (1-epsilon)*x_tilde
 
@@ -233,8 +233,8 @@ class GAN_Model(nn.Module):
 
         # Encode the all the data if self.loadInEpoch is false
         if self.loadInEpoch == False:
-            X_orig_one_hot = np.array(encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device), dtype=object)
-            s = X_orig_one_hot.shape[0]
+            X_orig_one_hot = encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device)
+            s = len(X_orig_one_hot)
         else:
             X = np.array(X, dtype=object)
             s = X.shape[0]
@@ -322,7 +322,7 @@ class GAN_Model(nn.Module):
                     # If disc_nums is empty, a problem occured
                     assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
                 else:
-                    real_X = X_orig_one_hot[disc_sub.cpu().numpy()]
+                    real_X = [X_orig_one_hot[i] for i in disc_sub.cpu().numpy()]
                 
                 # Add padding to the subset
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
