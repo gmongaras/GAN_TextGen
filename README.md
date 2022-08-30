@@ -21,5 +21,6 @@ https://docs.google.com/document/d/1_2mnS_jRa5RixBPNazFUxKrX-_Y-Bz9zZHglUnGHpgo/
 
 Note: Data from the following README:
 - Random Text: https://www.kaggle.com/datasets/kashnitsky/hierarchical-text-classification
+- Billion word language modeling benchmark: https://github.com/ciprian-chelba/1-billion-word-language-modeling-benchmark
 - Fortunes 1: https://github.com/ruanyf/fortunes
 - Fortunes 2: http://www.fortunecookiemessage.com/
