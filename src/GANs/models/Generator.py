@@ -192,30 +192,23 @@ class Generator(nn.Module):
         ## so that each outputted word is effected by the
         ## gradient of the length token.
 
-        # Add the <LEN> token to the end of the sequence
-        Y = torch.cat((Y, self.lenTok.clone()[0:1]), dim=1)
-
-        # Send the input through the transformer blocks
-        # without adding any noise
+        # Get the length estimation from the second model
         lens = Y
-        for block in self.transBlocks:
+        for block in self.lenGen:
             lens = block(lens, lens)
-            
-        # Send the input through the output MHA blocks
-        for block in self.outEmb:
-            lens = block(lens)
-            
-        # Get the encoded lengths from the output
-        lens = lens[:, -1]
 
         # Decode the lengths
-        lens = self.lensDec(lens)
+        lens = self.lensDec_E(lens).squeeze(-1)
+        lens = self.lensDec_S(lens)
 
-        # Clamp the lengths between 1 and S
-        # lens = torch.clamp(lens, 1, self.sequence_length)
+        # For each length, replace the values with PAD tokens
+        pad_tok = torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int64, device=self.device, requires_grad=False)
+        pad_tok = pad_tok.to(self.device)
+        for i in range(0, lens.shape[0]):
+            out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] = pad_tok.clone().unsqueeze(0)
         
         # Return the output
-        return out_sent.squeeze(), lens.squeeze()
+        return out_sent.squeeze()
 
     
     

@@ -228,9 +228,6 @@ class GAN_Model(nn.Module):
     #   X - A list of sentences to train the models on
     #   epochs - Number of epochs to train the models for
     def train_model(self, X, epochs):
-        # Save the sentence lengths
-        lens_labels = torch.tensor([len(i.split(" ")) for i in X], dtype=torch.int8, device=self.device, requires_grad=False)
-
         # Encode the all the data if self.loadInEpoch is false
         if self.loadInEpoch == False:
             X_orig_one_hot = encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device)
@@ -355,7 +352,7 @@ class GAN_Model(nn.Module):
                 discLoss_fake, discLoss_real = wasserstein_disc_split(disc_real_sent, disc_fake_sent)
 
                 # The cost of the discriminator is the loss + the penalty
-                discLoss = Loss_sent + self.batchSize*Loss_lens
+                discLoss = Loss_sent + Loss_lens
                 discCost = discLoss + gradient_penalty
                 
                 # Backpropogate the cost
@@ -414,7 +411,7 @@ class GAN_Model(nn.Module):
                 #genLoss = minimax_gen(disc_fake)
                 Loss_sent = wasserstein_gen(disc_fake_sent)
                 Loss_lens = wasserstein_gen(disc_fake_lens)
-                genLoss = Loss_sent + self.batchSize*Loss_lens
+                genLoss = Loss_sent + Loss_lens
 
                 
                 # Backpropogate the loss
