@@ -62,9 +62,6 @@ class Discriminator(nn.Module):
         # Create the class token which will be a tensor of 1s
         self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)
         
-        # Output MHA blocks
-        self.outEmb = nn.ModuleList([MHAwithNorm(embedding_size, embedding_size, embedding_size, num_heads) for i in range(O)]).to(device)
-        
         # Final feed-forward layer
         self.out_FC = nn.Linear(embedding_size, 1, device=device)
         self.Tanh = nn.Tanh().to(device)

@@ -130,11 +130,11 @@ def train(
     
     ### Load in the data ###
     sentences = []
-    max = 100000   # Max number of sentences to load in
+    m = 100000   # Max number of sentences to load in
     i = 0
     with open(input_file, "r", encoding='utf-8') as file:
         for line in file:
-            if i == max:
+            if i == m:
                 break
             i += 1
             sentences.append(line.strip())

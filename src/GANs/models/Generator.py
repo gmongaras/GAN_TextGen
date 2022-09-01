@@ -46,13 +46,11 @@ class Generator(nn.Module):
         self.device = device
         
         # Input embedding (noise to some sort of embedding)
-        #modules = [inTrans(embedding_size, num_heads, embedding_size) for i in range(M)]
-        #self.inEmb = nn.Sequential(*modules).to(device)
         modules = [nn.Linear(self.sequence_length, self.sequence_length) for i in range(M)]
-        self.inEmb2 = nn.Sequential(*modules).to(device)
+        self.inEmb = nn.Sequential(*modules).to(device)
         
         # Transformer blocks
-        self.transBlocks = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, device, 512) for i in range(B)]).to(device)
+        self.generator = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, device, 512) for i in range(B)]).to(device)
         
         # Output embedding MHA blocks
         self.outEmb = nn.ModuleList([inTrans(embedding_size, num_heads, 512) for i in range(O)]).to(device)
@@ -304,7 +302,7 @@ class Generator(nn.Module):
         noise = torch.rand((self.batchSize, self.sequence_length), requires_grad=False, device=self.device)
         
         # Send the noise through the input transformers
-        w = self.inEmb2(noise)
+        w = self.inEmb(noise)
         w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.embedding_size)
         
         # Depending on the embedding mode, pick how to
@@ -316,17 +314,9 @@ class Generator(nn.Module):
     
     # Forward train using normal Word2Vec embeddings
     def forward_train_norm(self, w):
-        # Initiailze the model output to <START> tokens
-        Y = torch.broadcast_to(self.Word2Vec.to(self.device)(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
-        
         # Get positional encodings for all tokens including future
         # tokens that will be generated
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
-        
-        # Add the positional encodings to the input tokens
-        Y += posEnc[:, 0:1]
-        if Y.requires_grad == False:
-            Y.requires_grad = True
 
         # Seed the next word prediction rom the model
         seeds = self.normDist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
@@ -334,59 +324,54 @@ class Generator(nn.Module):
             seeds.requires_grad = True
         
         # Add the seed tokens to the input
-        Y = torch.cat((Y, seeds), dim=1)
-        Y[:, 1] += posEnc[:, 1]
+        Y = seeds
         
         # The tokenzied output sentences
-        t = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-        t = t.float().to(self.device)
-        if t.requires_grad == False:
-            t.requires_grad = True
-        out_sent = [[t] for i in range(self.batchSize)]
+        out_sent = [[] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
-        for tok in range(1, self.sequence_length):
-            # Send the input through the transformer blocks
-            output = Y
-            for block in self.transBlocks:
+        for tok in range(0, self.sequence_length):
+            # Initialize the input as the current
+            # output with positional encodings
+            output = Y + posEnc[:, :tok+1]
+            
+            # Send the input through the generator blocks
+            # (N, S, E) -> (N, S, E)
+            for block in self.generator:
                 output = block(w[:, 0:Y.shape[1]], output)
                 
-            # Send the input through the output MHA blocks
+            # Send the input through the output embedding blocks
+            # (N, S, E) -> (N, S, E)
             for block in self.outEmb:
                 output = block(output)
                 
             # Get the token from the output
-            out_tok_b = output[:, tok]
+            # (N, S, E) -> (N, 1, E)
+            out_tok = output[:, tok]
             
             # Send the output through a softmax block
-            out_tok_soft = self.soft(out_tok_b)
-            
-            # Get the argmax of the output tokens
-            out_tok = torch.argmax(out_tok_soft, dim=-1)
+            # (N, 1, E) -> (N, 1, V)
+            out_tok_soft = self.soft(out_tok)
             
             # If the output encoding mode is "gumb", then
             # use the softmax gumbel function as opposed
             # to the softmax function
             if (self.outEnc == "gumb"):
-                out_tok_soft = torch.nn.functional.gumbel_softmax(torch.log(torch.clamp(self.gumb_linear(out_tok_b), 0.00001, torch.inf)), dim=-1)
+                out_tok_soft = torch.nn.functional.gumbel_softmax(torch.log(torch.clamp(self.gumb_linear(out_tok), 0.00001, torch.inf)), dim=-1)
             
-            # Save the softmax output
+            # Save the softmax output for the
             for i in range(self.batchSize):
                 out_sent[i].append(out_tok_soft[i])
-            
-            # Encode the output token
-            out_tok = self.Word2Vec(out_tok)
             
             # Add the new token to the output and add a new
             # seed to the sequence
             if tok+1 < self.sequence_length:
                 # Add the new token to the output
-                Y = torch.cat((Y.clone()[:, :tok], (out_tok + posEnc[:, tok]).unsqueeze(1)), dim=1)
+                Y = torch.cat((Y.clone()[:, :tok], (out_tok).unsqueeze(1)), dim=1)
 
                 # Seed the next word using gaussian noise
                 seeds = self.normDist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
                 Y = torch.cat((Y, seeds), dim=1) # Add the seeds
-                Y[:, tok+1] += posEnc[:, tok+1] # Add positional encodings to the seed token
                 
         
         # Turn the output into a tensor
@@ -401,12 +386,15 @@ class Generator(nn.Module):
         ## gradient of the length token.
 
         # Get the length estimation from the second model
+        # (N, S, E) -> (N, S, E)
         lens = Y
         for block in self.lenGen:
             lens = block(lens, lens)
 
         # Decode the lengths
+        # (N, S, E) -> (N, S, 1)
         lens = self.lensDec_E(lens).squeeze()
+        # (N, S) -> (N, S)
         lens = self.lensDec_S(lens)
 
         # For each length, replace the values with PAD tokens
@@ -416,7 +404,8 @@ class Generator(nn.Module):
             out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] = pad_tok.clone()
 
         
-        # Return the output
+        # Return the output:
+        # (N, S, V) and (N, S)
         return out_sent, lens
     
     
