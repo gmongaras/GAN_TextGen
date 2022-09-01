@@ -71,9 +71,6 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
     # Get the encoded form of <END>
     end_enc = encoder(torch.tensor(vocab_inv["<END>"], device=device))
     
-    # Get the encoded form of <START>
-    start_end = encoder(torch.tensor(vocab_inv["<START>"], device=device))
-    
     # Iterate over all sentences
     i = 0
     while ((len(X) != 0 and deleteOrig == True) or (i < len(X) and deleteOrig == False)):
@@ -83,8 +80,8 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         # Has the sentence been encoded?
         enc = True
         
-        # List of encoded words starting with <START>
-        enc_words = [start_end]
+        # List of encoded words
+        enc_words = []
         
         # Get the words from the sentence
         words = get_clean_words(sentence)
@@ -149,9 +146,6 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
     # Get the encoded form of <END>
     end_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
     
-    # Get the encoded form of <START>
-    start_end = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<START>"]), len(vocab_inv))
-    
     # Iterate over all sentences
     i = 0
     while ((len(X) != 0 and deleteOrig == True) or (i < len(X) and deleteOrig == False)):
@@ -161,8 +155,8 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
         # Has the sentence been encoded?
         enc = True
         
-        # List of encoded words starting with <START>
-        enc_words = [start_end]
+        # List of encoded words
+        enc_words = []
         
         # Get the words from the sentence
         words = get_clean_words(sentence)
