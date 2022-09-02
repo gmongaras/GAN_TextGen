@@ -45,19 +45,12 @@ class Discriminator(nn.Module):
         blocks = [discBlock(T, embedding_size, num_heads, pooling) for i in range(B)]
         self.disc_backbone = nn.Sequential(*blocks).to(device)
         
-        # The discriminator sentence classifier head for sentences
+        # The discriminator classifier head
         # (NxL+1xE) -> (N)
-        self.disc_head_sent_B = nn.Sequential(*[
+        self.disc_head_B = nn.Sequential(*[
             discBlock(T, embedding_size, num_heads, "none") for i in range(0, O)
         ]).to(device)
-        self.disc_head_sent_L = nn.Linear(embedding_size, 1, device=device)
-        
-        # The discriminator lens classifier head for sentences
-        # (NxL+1xE) -> (N)
-        self.disc_head_lens_B = nn.Sequential(*[
-            discBlock(T, embedding_size, num_heads, "none") for i in range(0, O)
-        ]).to(device)
-        self.disc_head_lens_L = nn.Linear(embedding_size, 1, device=device)
+        self.disc_head_L = nn.Linear(embedding_size, 1, device=device)
         
         # Create the class token which will be a tensor of 1s
         self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)
@@ -105,23 +98,17 @@ class Discriminator(nn.Module):
         # Add the class token to the output of the backbone
         X = torch.cat((self.clsTok[:X.shape[0]], X), dim=1)
         
-        # Get the predictions for the length
-        Y_len = self.disc_head_lens_B(X)[:, 0]
-        Y_len = self.disc_head_lens_L(Y_len)
-        
-        # Get the predictions for the sentences
-        Y_sent = self.disc_head_sent_B(X)[:, 0]
-        Y_sent = self.disc_head_sent_L(Y_sent)
+        # Get the predictions
+        X = self.disc_head_B(X)[:, 0]
+        X = self.disc_head_L(X)
         
         # Apply the optional activation
         if self.outMode == "sigmoid":
-            Y_len = self.Sigmoid(Y_len)
-            Y_sent = self.Sigmoid(Y_sent)
+            X = self.Sigmoid(X)
         elif self.outMode == "tanh":
-            Y_len = self.Tanh(Y_len)
-            Y_sent = self.Tanh(Y_sent)
+            X = self.Tanh(X)
         
-        return Y_sent.squeeze(), Y_len.squeeze()
+        return X.squeeze()
     
     
     

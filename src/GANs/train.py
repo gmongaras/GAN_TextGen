@@ -45,7 +45,7 @@ from typing import Optional
 @click.option("--gausNoise", "gausNoise", type=bool, default=True, help="True to add pure gaussian noise in the generator output encoding, False to not add this noise", required=False)
 
 @click.option("--trainingMode", "trainingMode", type=str, default="gan", help="How should the models be trained (\"gan\" to use a GAN model, \"diff\" to use a diffusion model, or \"norm\" to use neither)", required=False)
-@click.option("--pooling", "pooling", type=str, default="avg", help="Pooling mode for the discriminator blocks (\"avg\" to use average pooling, \"max\" to use max pooling, or \"none\" to use no pooling)", required=False)
+@click.option("--pooling", "pooling", type=str, default="none", help="Pooling mode for the discriminator blocks (\"avg\" to use average pooling, \"max\" to use max pooling, or \"none\" to use no pooling)", required=False)
 @click.option("--gen_outEnc_mode", "gen_outEnc_mode", type=str, default="norm", help="How should the outputs of the generator be encoded? (\"norm\" to use a softmax output or \"gumb\" to use a gumbel-softmax output)", required=False)
 @click.option("--embed_mode_gen", "embed_mode_gen", type=str, default="norm", help="Embedding mode for the generator (\"norm\" for normal Word2Vec embeddings or \"custom\" for custom embeddings)", required=False)
 @click.option("--embed_mode_disc", "embed_mode_disc", type=str, default="fc", help="Embedding mode for the discriminator (\"fc\" to use a fully-connected layer or \"pca\" to use PCA embeddings)", required=False)
@@ -177,16 +177,16 @@ def train(
     
     
     ### Training The Model ###
-    #model.loadModels("models", "gen_model - 3000.pkl", "disc_model - 3000.pkl")
+    #model.loadModels("models", "gen_model - 500.pkl", "disc_model - 500.pkl")
     model.train_model(sentences, epochs)
     print()
     
     
     ### Model Saving and Predictions ###
     with torch.no_grad():
-        noise = torch.rand((sequence_length), requires_grad=False)
-        out, lens = model.generator(noise)
-    lens = torch.argmax(lens, dim=-1)
+        out, lens = model.generator.forward_(training=False)
+    out = torch.argmax(out, dim=-1)[0]
+    lens = torch.argmax(lens, dim=-1)[0]
     for i in out[:lens.long().item()]:
         print(vocab[i.item()], end=" ")
     print()
