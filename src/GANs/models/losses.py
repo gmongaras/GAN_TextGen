@@ -63,6 +63,50 @@ def wasserstein_gen(y_pred_gen):
 
 
 
+
+### Loss functions for GLS-GAN
+
+# Inputs:
+#   disc_real - Discriminator output on real data
+#   disc_fake - Discriminator output on fake data
+#   cost_slope - Slope of the Leaky ReLU in the cost function
+def GLS_disc(disc_real, disc_fake, cost_slope, dist_funct="l1"):
+    # The distance between the real and fake distributions
+    if dist_funct == "l2":
+        dist = torch.nn.PairwiseDistance(1)(disc_real, disc_fake)
+    else:
+        dist = torch.nn.PairwiseDistance(2)(disc_real, disc_fake)
+    
+    # Return the loss
+    return torch.mean(torch.nn.LeakyReLU(cost_slope)(
+        disc_real - disc_fake + dist))
+    
+
+def GLS_disc_split(disc_real, disc_fake, cost_slope, dist_funct="l1"):
+    # The distance between the real and fake distributions
+    if dist_funct == "l2":
+        dist = torch.nn.PairwiseDistance(1)(disc_real, disc_fake)
+    else:
+        dist = torch.nn.PairwiseDistance(2)(disc_real, disc_fake)
+        
+    relu = torch.nn.LeakyReLU(cost_slope)
+    
+    # Return the loss values
+    return torch.mean(relu(disc_real)), \
+        -torch.mean(relu(disc_fake)), \
+        relu(dist)
+
+
+# Inputs:
+#   disc_fake - Discriminator output on fake data
+def GLS_gen(disc_fake):
+    return torch.mean(disc_fake)
+
+
+
+
+
+
 # Loss functions for the diffusion model
 def diff_disc(disc_real, disc_fake):
     return torch.mean(torch.log(disc_real)) + \

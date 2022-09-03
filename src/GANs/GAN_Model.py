@@ -8,6 +8,9 @@ from ..helpers.helpers import addPadding_one_hot
 from .models.losses import wasserstein_disc
 from .models.losses import wasserstein_disc_split
 from .models.losses import wasserstein_gen
+from .models.losses import GLS_disc
+from .models.losses import GLS_disc_split
+from .models.losses import GLS_gen
 from .models.losses import minimax_disc
 from .models.losses import minimax_gen
 from .models.losses import minimax_loss
@@ -329,9 +332,9 @@ class GAN_Model(nn.Module):
                 disc_real = self.discriminator(real_X, lens_real.float(), masks)
                 
                 # Get the discriminator loss
-                discLoss = wasserstein_disc(disc_real, disc_fake)
+                discLoss = GLS_disc(disc_real, disc_fake, 0.5, "l1")
                 
-                discLoss_fake, discLoss_real = wasserstein_disc_split(disc_real, disc_fake)
+                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, 0.5, "l1")
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -375,7 +378,7 @@ class GAN_Model(nn.Module):
                 disc_fake = self.discriminator(Y, lens_fake, masks)
                 
                 # Get the generator loss
-                genLoss = wasserstein_gen(disc_fake)
+                genLoss = GLS_gen(disc_fake)
 
                 
                 # Backpropogate the loss
@@ -400,9 +403,7 @@ class GAN_Model(nn.Module):
             
             
             # Flip the maximizing values to represent the actual value
-            genLoss *= -1
-            discLoss_real *= -1
-            discLoss *= -1
+            discLoss_fake *= -1
             
             
             # Save the loss values
@@ -411,7 +412,7 @@ class GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}", end="")
             if self.dynamic_n:
                 print(f"    r_g: {round(r_g, 4)}    r_d: {round(r_d, 4)}", end="")
             print()
