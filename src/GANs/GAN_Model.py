@@ -235,6 +235,7 @@ class GAN_Model(nn.Module):
         if self.loadInEpoch == False:
             X_orig_one_hot = encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device)
             s = len(X_orig_one_hot)
+            del X
         else:
             X = np.array(X, dtype=object)
             s = X.shape[0]
@@ -324,6 +325,9 @@ class GAN_Model(nn.Module):
                 # Get the gradient penalty
                 gradient_penalty = self.get_gradient_penalty(real_X, lens_real, Y, lens_fake)
 
+                # Calculate the mean reconstruction error for debugging
+                MRE = torch.min(torch.norm(real_X-Y))
+
                 # We don't need the generated output anymore
                 del Y
                 
@@ -332,9 +336,9 @@ class GAN_Model(nn.Module):
                 disc_real = self.discriminator(real_X, lens_real.float(), masks)
                 
                 # Get the discriminator loss
-                discLoss = GLS_disc(disc_real, disc_fake, 0.5, "l1")
+                discLoss = GLS_disc(disc_real, disc_fake, 0.01, "l1")
                 
-                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, 0.5, "l1")
+                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, 0.01, "l1")
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -412,7 +416,7 @@ class GAN_Model(nn.Module):
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}    MRE: {round(MRE.item(), 4)}", end="")
             if self.dynamic_n:
                 print(f"    r_g: {round(r_g, 4)}    r_d: {round(r_d, 4)}", end="")
             print()
