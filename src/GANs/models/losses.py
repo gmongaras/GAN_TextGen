@@ -73,9 +73,9 @@ def wasserstein_gen(y_pred_gen):
 def GLS_disc(disc_real, disc_fake, cost_slope, dist_funct="l1"):
     # The distance between the real and fake distributions
     if dist_funct == "l2":
-        dist = torch.nn.PairwiseDistance(1)(disc_real, disc_fake)
+        dist = 0.05*torch.nn.PairwiseDistance(2)(disc_real, disc_fake)
     else:
-        dist = torch.nn.PairwiseDistance(2)(disc_real, disc_fake)
+        dist = 0.001*torch.nn.PairwiseDistance(1)(disc_real, disc_fake)
     
     # Return the loss
     return torch.mean(torch.nn.LeakyReLU(cost_slope)(
@@ -85,9 +85,9 @@ def GLS_disc(disc_real, disc_fake, cost_slope, dist_funct="l1"):
 def GLS_disc_split(disc_real, disc_fake, cost_slope, dist_funct="l1"):
     # The distance between the real and fake distributions
     if dist_funct == "l2":
-        dist = torch.nn.PairwiseDistance(1)(disc_real, disc_fake)
+        dist = 0.05*torch.nn.PairwiseDistance(2)(disc_real, disc_fake)
     else:
-        dist = torch.nn.PairwiseDistance(2)(disc_real, disc_fake)
+        dist = 0.001*torch.nn.PairwiseDistance(1)(disc_real, disc_fake)
         
     relu = torch.nn.LeakyReLU(cost_slope)
     
