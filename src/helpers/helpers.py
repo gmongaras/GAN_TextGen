@@ -42,7 +42,7 @@ def get_clean_words(Sentence):
     words = word_tokenize(Sentence)
     
     # Remove all punctuation
-    words = [word for word in words if word.isalpha()]
+    words = [word.lower() for word in words if word.isalpha()]
     
     # Return the words
     return words
@@ -63,7 +63,10 @@ def get_clean_words(Sentence):
 #   A list of the same size with encoded sentences as tensors
 def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device):
     # Get the encoder on the correct device
-    encoder.to(device)
+    try:
+        encoder.to(device)
+    except:
+        pass
 
     # Final tensor of encoded sentences
     encoded = []

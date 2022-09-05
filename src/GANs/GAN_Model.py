@@ -230,8 +230,8 @@ class GAN_Model(nn.Module):
     def train_model(self, X, epochs):
         # Encode the all the data if self.loadInEpoch is false
         if self.loadInEpoch == False:
-            X_orig_one_hot = encode_sentences_one_hot(X, self.vocab_inv, self.sequence_length, self.delWhenLoaded, self.device)
-            s = len(X_orig_one_hot)
+            X_orig = encode_sentences(X, self.vocab_inv, self.sequence_length, lambda x: x, self.delWhenLoaded, self.device)
+            s = len(X_orig)
             del X
         else:
             X = np.array(X, dtype=object)
@@ -304,7 +304,8 @@ class GAN_Model(nn.Module):
                     # If disc_nums is empty, a problem occured
                     assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
                 else:
-                    real_X = [X_orig_one_hot[i] for i in disc_sub.cpu().numpy()]
+                    # Get the real sentences as one-hot sequences
+                    real_X = [torch.nn.functional.one_hot(X_orig[i], len(self.vocab)) for i in disc_sub.cpu().numpy()]
                 
                 # Add padding to the subset
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)

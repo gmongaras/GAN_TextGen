@@ -136,7 +136,7 @@ def train(
     
     ### Load in the data ###
     sentences = []
-    m = 100000   # Max number of sentences to load in
+    m = 10000000   # Max number of sentences to load in
     i = 0
     with open(input_file, "r", encoding='utf-8') as file:
         for line in file:
