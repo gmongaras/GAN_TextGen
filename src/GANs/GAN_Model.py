@@ -1,4 +1,3 @@
-from distutils.ccompiler import gen_lib_options
 from ..helpers.helpers import encode_sentences
 from ..helpers.helpers import encode_sentences_one_hot
 from ..helpers.helpers import addPadding
@@ -47,13 +46,15 @@ class GAN_Model(nn.Module):
     #   vocab - A dictionary of vocab where the keys are integers and the
     #           values are words
     #   M_gen - Number of noise encoding blocks in the generator
-    #   B_gen - Number of generator blocks in the generator
-    #   O_gen - Number of MHA blocks in the generator
-    #   gausNoise - True to add pure gaussian noise in the generator output
-    #               encoding, False to not add this noise
+    #   B_gen - Number of transformer blocks to encode the input sequence
+    #   O_gen - Number of transformer blocks to get the output sequence
+    #   L_gen - Number of transformer blocks to encode the lengths
     #   T_disc - Number of transformer blocks in each discriminator block
     #   B_disc - Number of discriminator blocks in the discriminator
     #   O_disc - Number of output MHA blocks in the discrimiantor
+    #   hiddenSize - Hidden linear size in the transformer blocks
+    #   useNorm - True to use a normal distribution for noise, False
+    #             to use a uniform distribution
     #   batchSize - Size to bach data into
     #   embedding_size_gen - Embedding size of the generator
     #   embedding_size_disc - Embedding size of the discriminator
@@ -86,7 +87,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, gausNoise, T_disc, B_disc, O_disc, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, L_gen, T_disc, B_disc, O_disc, hiddenSize, useNorm, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -133,15 +134,18 @@ class GAN_Model(nn.Module):
         
         # The generator, discriminator, and teacher models
         if self.dev != "cpu":
-            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
-            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, sequence_length, num_heads, pooling, embed_mode_disc, gpu)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, L_gen, useNorm, hiddenSize, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", hiddenSize, batchSize, len(vocab), embedding_size_disc, sequence_length, num_heads, pooling, embed_mode_disc, gpu)
         else:
-            self.generator = Generator(vocab, M_gen, B_gen, O_gen, gausNoise, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
-            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", batchSize, len(vocab), embedding_size_disc, sequence_length, num_heads, pooling, embed_mode_disc, device)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, L_gen, useNorm, hiddenSize, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
+            self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", hiddenSize, batchSize, len(vocab), embedding_size_disc, sequence_length, num_heads, pooling, embed_mode_disc, device)
         
         # The optimizer for the models
         self.optim_gen = torch.optim.Adam(self.generator.parameters(), alpha, betas=[Beta1, Beta2])
         self.optim_disc = torch.optim.Adam(self.discriminator.parameters(), alpha, betas=[Beta1, Beta2])
+
+        # Uniform distribution for the gradient penalty
+        self.unif = torch.distributions.uniform.Uniform(0, 1)
         
         
     def one_hot(a, num_classes):
@@ -161,7 +165,7 @@ class GAN_Model(nn.Module):
             device = gpu
 
         # Sample a uniform distribution to get a random number, epsilon
-        epsilon = torch.rand((self.batchSize, 1, 1), requires_grad=True, device=device)
+        epsilon = self.unif.sample((self.batchSize, 1, 1)).to(device)
         
         # Create a new tensor fo the same shape as the real and fake data
         lens_hat = epsilon.squeeze(-1)*lens_real + (1-epsilon.squeeze(-1))*lens_fake.squeeze()
@@ -176,11 +180,11 @@ class GAN_Model(nn.Module):
         
         # Send the transformed and combined data through the
         # discriminator
-        disc = self.discriminator(x_hat, lens_hat)
+        disc_hat = self.discriminator(x_hat, lens_hat)
         
         # Get the gradients of the discriminator output
-        gradients = torch.autograd.grad(outputs=(disc), inputs=(x_hat),
-                              grad_outputs=(torch.ones(disc.size(), device=device)),
+        gradients = torch.autograd.grad(outputs=(disc_hat), inputs=(x_hat, lens_hat),
+                              grad_outputs=(torch.ones(disc_hat.size(), device=device)),
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
         gradients = gradients.view(gradients.size(0), -1)
         
@@ -245,6 +249,7 @@ class GAN_Model(nn.Module):
         self.discLoss = []
         self.discLoss_real = []
         self.discLoss_fake = []
+        self.MREs = []
         
         # Initial variable states
         masks = None
@@ -281,11 +286,11 @@ class GAN_Model(nn.Module):
                 
                 # Generate some data from the generator
                 with torch.no_grad():
-                    Y, lens_fake = self.generator.forward_(training=False)
+                    fake_X, lens_fake = self.generator.forward_(training=False)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = self.discriminator(Y, lens_fake, masks)
+                disc_fake = self.discriminator(fake_X, lens_fake, masks)
                 
                 # Get a real data subset using one_hot encoding
                 if self.loadInEpoch == True:
@@ -323,22 +328,19 @@ class GAN_Model(nn.Module):
                 lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length)
 
                 # Get the gradient penalty
-                gradient_penalty = self.get_gradient_penalty(real_X, lens_real, Y, lens_fake)
+                gradient_penalty = self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake)
 
                 # Calculate the mean reconstruction error for debugging
-                MRE = torch.min(torch.norm(real_X-Y))
-
-                # We don't need the generated output anymore
-                del Y
+                MRE =  torch.abs(real_X-fake_X).sum(-1).sum(-1).mean()
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences
                 disc_real = self.discriminator(real_X, lens_real.float(), masks)
                 
                 # Get the discriminator loss
-                discLoss = GLS_disc(disc_real, disc_fake, 0.01, "l1")
+                discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, 0.01, "l1")
                 
-                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, 0.01, "l1")
+                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, 0.01, "l1")
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -371,15 +373,15 @@ class GAN_Model(nn.Module):
                     
                 
                 # Generate some data from the generator
-                Y, lens_fake = self.generator.forward_(training=True)
+                fake_X, lens_fake = self.generator.forward_(training=True)
                 
                 # Generate masks for the fake data
                 if self.HideAfterEnd:
-                    masks = self.getMasks(Y)
+                    masks = self.getMasks(fake_X)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = self.discriminator(Y, lens_fake, masks)
+                disc_fake = self.discriminator(fake_X, lens_fake, masks)
                 
                 # Get the generator loss
                 genLoss = GLS_gen(disc_fake)
@@ -393,7 +395,7 @@ class GAN_Model(nn.Module):
                 self.optim_gen.zero_grad()
             
                 # Delete all generator stuff as its no longer needed
-                del disc_sub, Y, lens_fake
+                del disc_sub, fake_X, lens_fake
 
             
             # Dynamic n updates:
@@ -415,6 +417,7 @@ class GAN_Model(nn.Module):
             self.discLoss.append(discLoss.item())
             self.discLoss_real.append(discLoss_real.item())
             self.discLoss_fake.append(discLoss_fake.item())
+            self.MREs.append(MRE.item())
             
             print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}    MRE: {round(MRE.item(), 4)}", end="")
             if self.dynamic_n:
@@ -450,6 +453,15 @@ class GAN_Model(nn.Module):
                 ax.set_ylabel("Loss")
                 ax.legend()
                 plt.savefig(self.saveDir + os.sep + self.trainGraphFile)
+                plt.close()
+
+                fix, ax = plt.subplots()
+                ax.plot(y, self.MREs, label="MRE")
+                ax.set_title("MRE over epochs")
+                ax.set_xlabel("Epochs")
+                ax.set_ylabel("MRE")
+                ax.legend()
+                plt.savefig(self.saveDir + os.sep + "MREGraph.png")
                 plt.close()
     
     # Load the models

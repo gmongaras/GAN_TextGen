@@ -14,6 +14,7 @@ class Discriminator(nn.Module):
     #   O - Number of output MHA blocks in the discrimiantor
     #   outMode - How should the output be transformed?
     #             ("none", "sigmoid", or "tanh")
+    #   hiddenSize - Hidden linear size in the transformer blocks
     #   batchSize - Batch size of the input sequence
     #   vocab_size - The size of the vocab used by the generator.
     #                Note: This value is the embedding size
@@ -25,7 +26,7 @@ class Discriminator(nn.Module):
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
     #   embed_mode - The embedding mode to be used ("fc" or "pca")
     #   device - Device to put the model on
-    def __init__(self, T, B, O, outMode, batchSize, vocab_size, embedding_size, sequence_length, num_heads, pooling, embed_mode, device):
+    def __init__(self, T, B, O, outMode, hiddenSize, batchSize, vocab_size, embedding_size, sequence_length, num_heads, pooling, embed_mode, device):
         super(Discriminator, self).__init__()
 
         self.device = device
@@ -42,13 +43,13 @@ class Discriminator(nn.Module):
         # Create the discriminator backbone. Note, each
         # block halves the sequence length if pooling is used
         # (NxS+1xE) -> (NxLxE)
-        blocks = [discBlock(T, embedding_size, num_heads, pooling) for i in range(B)]
+        blocks = [discBlock(T, embedding_size, num_heads, hiddenSize, pooling) for i in range(B)]
         self.disc_backbone = nn.Sequential(*blocks).to(device)
         
         # The discriminator classifier head
         # (NxL+1xE) -> (N)
         self.disc_head_B = nn.Sequential(*[
-            discBlock(T, embedding_size, num_heads, "none") for i in range(0, O)
+            discBlock(T, embedding_size, num_heads, hiddenSize, "none") for i in range(0, O)
         ]).to(device)
         self.disc_head_L = nn.Linear(embedding_size, 1, device=device)
         

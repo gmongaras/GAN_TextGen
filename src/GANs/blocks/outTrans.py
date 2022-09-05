@@ -12,15 +12,14 @@ class outTrans(nn.Module):
     #         values in the second MHA block
     #   E_2 - Input embedding from the input into
     #         the beginning of the transformer
-    #   gausNoise - True to add pure gaussian noise in the B output blocks,
-    #               False to not add gaussian noise
+    #   useNorm - True to use a normal distribution for noise, False
+    #             to use
     #   num_heads - Number of heads in each MHA block
     #   device - Device to put tensors on
     #   hidden_size - Hidden size of the linear layer
-    def __init__(self, E_1, E_2, gausNoise, num_heads, device, hidden_size=512):
+    def __init__(self, E_1, E_2, useNorm, num_heads, device, hidden_size=512):
         super(outTrans, self).__init__()
         self.device = device
-        self.gausNoise = gausNoise
         
         # The first MHA module with a mask
         self.MHA1 = MHA(E_2, E_2, E_2, num_heads).to(device)
@@ -38,6 +37,12 @@ class outTrans(nn.Module):
         self.LN1 = nn.LayerNorm(E_2, device=device)
         self.LN2 = nn.LayerNorm(E_2, device=device)
         self.LN3 = nn.LayerNorm(E_2, device=device)
+
+        # Normal or uniform distribution for the model
+        if useNorm == True:
+            self.dist = torch.distributions.normal.Normal(0, 1)
+        else:
+            self.dist = torch.distributions.uniform.Uniform(-1, 1)
     
     
     # Input:
@@ -50,9 +55,8 @@ class outTrans(nn.Module):
         X += X_2
         X = self.LN1(X)
         
-        # Add gaussian noise if set to true
-        if self.gausNoise:
-            X += torch.rand((X.shape), requires_grad=True, device=self.device)
+        # Add noise using the given noise distribution
+        X += self.dist.sample(X.shape).float().to(self.device)
         
         X_saved = X.clone()
         X = self.MHA2(X_1, X)

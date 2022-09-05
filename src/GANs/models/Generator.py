@@ -14,12 +14,13 @@ from ..blocks.MHAwithNorm import MHAwithNorm
 class Generator(nn.Module):
     # Inputs:
     #   vocab - The vocabulary of the model
-    #   M - Number of input embedding blocks
-    #   B - Number of transformer blocks when encoding the output
-    #   O - Number of MHA blocks after the transformer blocks
-    #       when encoding the output
-    #   gausNoise - True to add pure gaussian noise in the B output blocks,
-    #               False to not add gaussian noise
+    #   M - Number of input noise embedding blocks
+    #   B - Number of transformer blocks to encode the input sequence
+    #   O - Number of transformer blocks to get the output sequence
+    #   L - Number of transformer blocks to encode the lengths
+    #   useNorm - True to use a normal distribution for noise, False
+    #             to use a uniform distribution
+    #   hiddenSize - Hidden linear size in the transformer blocks
     #   batchSize - Size of the batch of sentences to generate
     #   embedding_size - Size of each word embedding
     #   sequence_length - Max sequence length of the output sentence
@@ -30,13 +31,12 @@ class Generator(nn.Module):
     #            output sequences which will be fed into the
     #            discriminator? ("norm", "gumb")
     #   device - The device to put the model on
-    def __init__(self, vocab, M, B, O, gausNoise, batchSize, embedding_size, sequence_length, num_heads, embed_mode, outEnc, device):
+    def __init__(self, vocab, M, B, O, L, useNorm, hiddenSize, batchSize, embedding_size, sequence_length, num_heads, embed_mode, outEnc, device):
         super(Generator, self).__init__()
         
         # Saved states
         self.vocab = vocab
         self.vocab_inv = {vocab[i]:i for i in vocab.keys()}
-        self.gausNoise = gausNoise
         self.batchSize = batchSize
         self.embedding_size = embedding_size
         self.sequence_length = sequence_length
@@ -50,10 +50,10 @@ class Generator(nn.Module):
         self.inEmb = nn.Sequential(*modules).to(device)
         
         # Transformer blocks
-        self.generator = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, device, 512) for i in range(B)]).to(device)
+        self.generator = nn.ModuleList([outTrans(embedding_size, embedding_size, useNorm, num_heads, device, hiddenSize) for i in range(B)]).to(device)
         
-        # Output embedding MHA blocks
-        self.outEmb = nn.ModuleList([inTrans(embedding_size, num_heads, 512) for i in range(O)]).to(device)
+        # Output embedding transformer blocks
+        self.outEmb = nn.ModuleList([inTrans(embedding_size, num_heads, hiddenSize) for i in range(O)]).to(device)
         
         # If the embed_mode is "custom", use the custom embedding mode
         if embed_mode == "custom":
@@ -75,14 +75,14 @@ class Generator(nn.Module):
         if outEnc == "gumb":
             self.gumb_linear = nn.Linear(embedding_size, len(self.vocab.keys())).to(device)
 
-        # Normal distribution for the model
-        self.normDist = torch.distributions.normal.Normal(0, 1)
+        # Normal or uniform distribution for the model
+        if useNorm == True:
+            self.dist = torch.distributions.normal.Normal(0, 1)
+        else:
+            self.dist = torch.distributions.uniform.Uniform(-1, 1)
 
-        # <LEN> token for the model
-        self.lenTok = torch.ones((self.batchSize, 1, embedding_size), device=device, dtype=torch.float32, requires_grad=False)
-
-        # Model used to predict the legths of the model
-        self.lenGen = nn.ModuleList([outTrans(embedding_size, embedding_size, gausNoise, num_heads, device, 512) for i in range(2)]).to(device)
+         # Model used to predict the legths of the model
+        self.lenGen = nn.ModuleList([inTrans(embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
 
         # Linear layer used to decode the lengths
         self.lensDec_E = nn.Linear(embedding_size, 1, device=device)
@@ -111,9 +111,10 @@ class Generator(nn.Module):
             self.eval()
         
         # Generate some noise
-        noise = torch.rand((self.batchSize, self.sequence_length), requires_grad=False, device=self.device)
+        noise = self.dist.sample((self.batchSize, self.sequence_length)).float().to(self.device)
+        noise.requires_grad = True
         
-        # Send the noise through the input transformers
+        # Send the noise through the input blocks
         w = self.inEmb(noise)
         w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.embedding_size)
         
@@ -130,8 +131,8 @@ class Generator(nn.Module):
         # tokens that will be generated
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
 
-        # Seed the next word prediction rom the model
-        seeds = self.normDist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
+        # Seed the next word prediction from the model
+        seeds = self.dist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
         if seeds.requires_grad == False:
             seeds.requires_grad = True
         
@@ -181,8 +182,8 @@ class Generator(nn.Module):
                 # Add the new token to the output
                 Y = torch.cat((Y.clone()[:, :tok], (out_tok).unsqueeze(1)), dim=1)
 
-                # Seed the next word using gaussian noise
-                seeds = self.normDist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
+                # Seed the next word using noise from a distribution
+                seeds = self.dist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
                 Y = torch.cat((Y, seeds), dim=1) # Add the seeds
                 
         
@@ -201,7 +202,7 @@ class Generator(nn.Module):
         # (N, S, E) -> (N, S, E)
         lens = Y
         for block in self.lenGen:
-            lens = block(lens, lens)
+            lens = block(lens)
 
         # Decode the lengths
         # (N, S, E) -> (N, S, 1)
