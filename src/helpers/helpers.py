@@ -68,9 +68,6 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
     # Final tensor of encoded sentences
     encoded = []
     
-    # Get the encoded form of <END>
-    end_enc = encoder(torch.tensor(vocab_inv["<END>"], device=device))
-    
     # Iterate over all sentences
     i = 0
     while ((len(X) != 0 and deleteOrig == True) or (i < len(X) and deleteOrig == False)):
@@ -104,12 +101,9 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         
         # If the word has not been encoded, an error happened, so
         # skip the sentence and delete it
-        if enc == False:
+        if enc == False or len(enc_words) == 0:
             del X[i]
             continue
-        
-        # Add an <END> token to the sequence
-        enc_words.append(end_enc)
         
         # Skip the sentence and delete it if it's too long
         if len(enc_words) > sequence_length:
@@ -142,9 +136,6 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
 def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
     # Final tensor of encoded sentences
     encoded = []
-    
-    # Get the encoded form of <END>
-    end_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
     
     # Iterate over all sentences
     i = 0
@@ -179,12 +170,9 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
             
         # If the word has not been encoded, an error happened, so
         # skip the sentence and delete it
-        if enc == False:
+        if enc == False or len(enc_words) == 0:
             del X[i]
             continue
-        
-        # Add an <END> token to the sequence
-        enc_words.append(end_enc)
         
         # Skip the sentence and delete it if it's too long
         if len(enc_words) > sequence_length:

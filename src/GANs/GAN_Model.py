@@ -55,6 +55,7 @@ class GAN_Model(nn.Module):
     #   hiddenSize - Hidden linear size in the transformer blocks
     #   useNorm - True to use a normal distribution for noise, False
     #             to use a uniform distribution
+    #   costSlope - The slope of the GLS-GAN cost function
     #   batchSize - Size to bach data into
     #   embedding_size_gen - Embedding size of the generator
     #   embedding_size_disc - Embedding size of the discriminator
@@ -87,7 +88,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, L_gen, T_disc, B_disc, O_disc, hiddenSize, useNorm, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, L_gen, T_disc, B_disc, O_disc, hiddenSize, useNorm, costSlope, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -103,6 +104,7 @@ class GAN_Model(nn.Module):
         self.HideAfterEnd = HideAfterEnd
         self.delWhenLoaded = delWhenLoaded if self.loadInEpoch == False else False
         self.embedding_size_disc = embedding_size_disc
+        self.costSlope = costSlope
         
         # Saving paramters
         self.saveSteps = saveSteps
@@ -194,18 +196,19 @@ class GAN_Model(nn.Module):
     
     
     
-    # Given some encoded sentence data, return masks masking tokens
-    # after the first <END> token in the sentence
+    # Given some encoded sentence data, return the
+    # lengths of each sentence
     # Input:
     #   data - Data of the shape (N, S, V)
     # Output:
-    #   Masks of the shape (N, S)
-    def getMasks(self, data):
-        # Position of any <END> tokens in the outut
+    #   Positions of the shape (N)
+    def getLens(self, data):
+        # Position of any <END> tokens in the outut. Defaults
+        # to the last position.
         end_pos = data.shape[1]*torch.ones((data.shape[0]), requires_grad=False, dtype=torch.int16)
         
-        # Get the position of the first <END> token for each generated sequence
-        whereEnd = torch.where(torch.argmax(data, dim=-1).cpu() == self.vocab_inv["<END>"])
+        # Get the position of the first <PAD> token for each generated sequence
+        whereEnd = torch.where(torch.argmax(data, dim=-1).cpu() == self.vocab_inv["<PAD>"])
         uniq = torch.unique(whereEnd[0], dim=0, sorted=False, return_inverse=True, return_counts=True)
         vals = torch.zeros(uniq[0].shape, dtype=torch.int16, requires_grad=False)
         i = 0
@@ -213,20 +216,10 @@ class GAN_Model(nn.Module):
             vals[j] = whereEnd[1][i]
             i += uniq[2][j]
         end_pos[uniq[0]] = vals.to(torch.int16)
-        end_pos = end_pos.long()
-        
-        # Generate a tensor used to mask the MHA
-        masks = torch.zeros((data.shape[0], data.shape[1]+1), dtype=torch.bool, requires_grad=False, device=self.device)
-        
-        # Make all parts of the tensor after the <PAD> tokens
-        # True to signify that the position should not be attended to
-        for i in range(0, len(end_pos)):
-            if end_pos[i] == -1:
-                continue
-            masks[i, end_pos[i]+2:] = True
+        end_pos = end_pos.long()-1
             
         # Return the output and the masks
-        return masks.to(self.device if self.dev != "partgpu" else gpu), end_pos.to(self.device if self.dev != "partgpu" else gpu)
+        return end_pos.to(self.device if self.dev != "partgpu" else gpu)
     
     
     
@@ -320,9 +313,8 @@ class GAN_Model(nn.Module):
                 else:
                     real_X = real_X.to(self.device)
 
-                # Get the real data masks and lengths
-                # masks, lens_real = self.getMasks(real_X)
-                _, lens_real = self.getMasks(real_X)
+                # Get the real data lengths
+                lens_real = self.getLens(real_X)
 
                 # One hot encode the lengths
                 lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length)
@@ -338,9 +330,9 @@ class GAN_Model(nn.Module):
                 disc_real = self.discriminator(real_X, lens_real.float(), masks)
                 
                 # Get the discriminator loss
-                discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, 0.01, "l1")
+                discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
                 
-                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, 0.01, "l1")
+                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -374,10 +366,6 @@ class GAN_Model(nn.Module):
                 
                 # Generate some data from the generator
                 fake_X, lens_fake = self.generator.forward_(training=True)
-                
-                # Generate masks for the fake data
-                if self.HideAfterEnd:
-                    masks = self.getMasks(fake_X)
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences

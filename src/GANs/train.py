@@ -45,6 +45,7 @@ from typing import Optional
 @click.option("--sequence_length", "sequence_length", type=int, default=64, help="Max number of words in sentence to train the model with", required=False)
 @click.option("--num_heads", "num_heads", type=int, default=8, help="Number of heads in each MHA block", required=False)
 @click.option("--useNorm", "useNorm", type=bool, default=True, help="True to use a normal distribution for noise, False to use a uniform distribution", required=False)
+@click.option("--costSlope", "costSlope", type=int, default=0.5, help="The slope of the GLS-GAN cost function", required=False)
 
 @click.option("--trainingMode", "trainingMode", type=str, default="gan", help="How should the models be trained (\"gan\" to use a GAN model, \"diff\" to use a diffusion model, or \"norm\" to use neither)", required=False)
 @click.option("--pooling", "pooling", type=str, default="none", help="Pooling mode for the discriminator blocks (\"avg\" to use average pooling, \"max\" to use max pooling, or \"none\" to use no pooling)", required=False)
@@ -101,6 +102,7 @@ def train(
     sequence_length: Optional[int],
     num_heads: Optional[int],
     useNorm: Optional[bool],
+    costSlope: Optional[int],
 
     trainingMode: Optional[str],
     pooling: Optional[str],
@@ -134,7 +136,7 @@ def train(
     
     ### Load in the data ###
     sentences = []
-    m = 1000   # Max number of sentences to load in
+    m = 100000   # Max number of sentences to load in
     i = 0
     with open(input_file, "r", encoding='utf-8') as file:
         for line in file:
@@ -163,7 +165,7 @@ def train(
                 Beta_0, Beta_T, T_min, T_max, sigma, d_target, C)
     elif trainingMode.lower() == "gan":
         model = GAN_Model(vocab, M_gen, B_gen, O_gen, L_gen,
-                T_disc, B_disc, O_disc, hiddenSize, useNorm,
+                T_disc, B_disc, O_disc, hiddenSize, useNorm, costSlope,
                 batchSize, embedding_size_gen, embedding_size_disc,
                 sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd,
                 n_D, pooling, gen_outEnc_mode,
