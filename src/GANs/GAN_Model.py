@@ -207,8 +207,8 @@ class GAN_Model(nn.Module):
         # to the last position.
         end_pos = data.shape[1]*torch.ones((data.shape[0]), requires_grad=False, dtype=torch.int16)
         
-        # Get the position of the first <PAD> token for each generated sequence
-        whereEnd = torch.where(torch.argmax(data, dim=-1).cpu() == self.vocab_inv["<PAD>"])
+        # Get the position of the first <END> token for each generated sequence
+        whereEnd = torch.where(torch.argmax(data, dim=-1).cpu() == self.vocab_inv["<END>"])
         uniq = torch.unique(whereEnd[0], dim=0, sorted=False, return_inverse=True, return_counts=True)
         vals = torch.zeros(uniq[0].shape, dtype=torch.int16, requires_grad=False)
         i = 0
@@ -216,7 +216,7 @@ class GAN_Model(nn.Module):
             vals[j] = whereEnd[1][i]
             i += uniq[2][j]
         end_pos[uniq[0]] = vals.to(torch.int16)
-        end_pos = end_pos.long()-1
+        end_pos = end_pos.long()
             
         # Return the output and the masks
         return end_pos.to(self.device if self.dev != "partgpu" else gpu)
@@ -324,7 +324,7 @@ class GAN_Model(nn.Module):
                 gradient_penalty = self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake)
 
                 # Calculate the mean reconstruction error for debugging
-                MRE =  torch.abs(real_X-fake_X).sum(-1).sum(-1).mean()
+                MRE = torch.abs(real_X-fake_X).sum(-1).sum(-1).mean()
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences

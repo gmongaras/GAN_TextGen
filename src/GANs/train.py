@@ -31,21 +31,21 @@ from typing import Optional
 
 
 # General model parameters
-@click.option("--M_gen", "M_gen", type=int, default=2, help="Number of input noise embedding blocks", required=False)
-@click.option("--B_gen", "B_gen", type=int, default=2, help="Number of transformer blocks to encode the input sequence", required=False)
+@click.option("--M_gen", "M_gen", type=int, default=8, help="Number of input noise embedding blocks", required=False)
+@click.option("--B_gen", "B_gen", type=int, default=4, help="Number of transformer blocks to encode the input sequence", required=False)
 @click.option("--O_gen", "O_gen", type=int, default=2, help="Number of transformer blocks to get the output sequence", required=False)
-@click.option("--L_gen", "L_gen", type=int, default=2, help="Number of transformer blocks to encode the lengths", required=False)
+@click.option("--L_gen", "L_gen", type=int, default=4, help="Number of transformer blocks to encode the lengths", required=False)
 @click.option("--embedding_size_gen", "embedding_size_gen", type=int, default=64, help="Word embedding size for the generator", required=False)
 @click.option("--T_disc", "T_disc", type=int, default=2, help="Number of transformer blocks in each discriminator block", required=False)
-@click.option("--B_disc", "B_disc", type=int, default=2, help="Number of discriminator blocks in the discriminator", required=False)
-@click.option("--O_disc", "O_disc", type=int, default=2, help="Number of output MHA blocks for each transformer in the discrimiantor", required=False)
+@click.option("--B_disc", "B_disc", type=int, default=4, help="Number of discriminator blocks in the discriminator", required=False)
+@click.option("--O_disc", "O_disc", type=int, default=4, help="Number of output MHA blocks for each transformer in the discrimiantor", required=False)
 @click.option("--embedding_size_disc", "embedding_size_disc", type=int, default=64, help="Word embedding size for the discriminator", required=False)
 @click.option("--hiddenSize", "hiddenSize", type=int, default=512, help="Hidden linear size in the transformer blocks", required=False)
 @click.option("--batchSize", "batchSize", type=int, default=64, help="Batch size used to train the model", required=False)
 @click.option("--sequence_length", "sequence_length", type=int, default=64, help="Max number of words in sentence to train the model with", required=False)
 @click.option("--num_heads", "num_heads", type=int, default=8, help="Number of heads in each MHA block", required=False)
-@click.option("--useNorm", "useNorm", type=bool, default=True, help="True to use a normal distribution for noise, False to use a uniform distribution", required=False)
-@click.option("--costSlope", "costSlope", type=int, default=0.5, help="The slope of the GLS-GAN cost function", required=False)
+@click.option("--useNorm", "useNorm", type=bool, default=False, help="True to use a normal distribution for noise, False to use a uniform distribution", required=False)
+@click.option("--costSlope", "costSlope", type=float, default=0.1, help="The slope of the GLS-GAN cost function", required=False)
 
 @click.option("--trainingMode", "trainingMode", type=str, default="gan", help="How should the models be trained (\"gan\" to use a GAN model, \"diff\" to use a diffusion model, or \"norm\" to use neither)", required=False)
 @click.option("--pooling", "pooling", type=str, default="none", help="Pooling mode for the discriminator blocks (\"avg\" to use average pooling, \"max\" to use max pooling, or \"none\" to use no pooling)", required=False)
@@ -53,11 +53,11 @@ from typing import Optional
 @click.option("--embed_mode_gen", "embed_mode_gen", type=str, default="norm", help="Embedding mode for the generator (\"norm\" for normal Word2Vec embeddings or \"custom\" for custom embeddings)", required=False)
 @click.option("--embed_mode_disc", "embed_mode_disc", type=str, default="fc", help="Embedding mode for the discriminator (\"fc\" to use a fully-connected layer or \"pca\" to use PCA embeddings)", required=False)
 @click.option("--alpha", "alpha", type=float, default=0.00005, help="Model learning rate", required=False)
-@click.option("--Beta1", "Beta1", type=float, default=0.0, help="Adam beta 1 term", required=False)
+@click.option("--Beta1", "Beta1", type=float, default=0.5, help="Adam beta 1 term", required=False)
 @click.option("--Beta2", "Beta2", type=float, default=0.9, help="Adam beta 2 term", required=False)
 @click.option("--device", "device", type=str, default="partgpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
 @click.option("--epochs", "epochs", type=int, default=300000, help="Number of epochs to train the model", required=False)
-@click.option("--n_D", "n_D", type=int, default=5, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
+@click.option("--n_D", "n_D", type=int, default=1, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
 @click.option("--saveSteps", "saveSteps", type=int, default=100, help="Number of steps until the model is saved", required=False)
 @click.option("--loadInEpoch", "loadInEpoch", type=bool, default=False, help="Should the data be loaded in as needed instead of before training? (True if so, False to load before training)", required=False)
 @click.option("--delWhenLoaded", "delWhenLoaded", type=bool, default=True, help="Delete the data as it's loaded in to free allocated memory? Note: This is automatically False if loadInEpoch is True", required=False)
@@ -102,7 +102,7 @@ def train(
     sequence_length: Optional[int],
     num_heads: Optional[int],
     useNorm: Optional[bool],
-    costSlope: Optional[int],
+    costSlope: Optional[float],
 
     trainingMode: Optional[str],
     pooling: Optional[str],
@@ -183,7 +183,7 @@ def train(
     
     
     ### Training The Model ###
-    #model.loadModels("models", "gen_model - 300.pkl", "disc_model - 500.pkl")
+    #model.loadModels("models", "gen_model - 200.pkl", "disc_model - 100.pkl")
     model.train_model(sentences, epochs)
     print()
     

@@ -202,7 +202,7 @@ class Generator(nn.Module):
         # (N, S, E) -> (N, S, E)
         lens = Y
         for block in self.lenGen:
-            lens = block(lens)
+            lens = block(lens.clone().detach())
 
         # Decode the lengths
         # (N, S, E) -> (N, S, 1)
