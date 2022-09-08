@@ -6,7 +6,7 @@ from src.helpers.helpers import get_clean_words
 indir = "data/Text2/train_data" # Directory with txt files to read in
 outFile = "data/Text2/data.txt" # File to put all output data to
 maxSentSize = 64     # Max number of words in a sentence to load in
-limit = 30000 # Limit on the number of sentences to load in
+limit = 500000 # Limit on the number of sentences to load in
 
 
 

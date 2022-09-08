@@ -7,7 +7,7 @@ import random
 def generate():
     vocabFile = "data/Text2/data.txt"
     outFile = "vocab_text2.csv"
-    limit = 1000000000000
+    limit = 68600
     randomize = True # Randomize the vocab to stray from bias
     
     
@@ -15,10 +15,12 @@ def generate():
     vocab = {"<START>": 0, "<PAD>": 1, "<END>": 2, "<NEXT>": 3}
     
     i = len(vocab)
+    sents = 0
     
     # Iterate over all lines in the file
     file = open(vocabFile, "r", encoding="utf-8")
     for line in file:
+        sents += 1
         
         # Get the words
         words = get_clean_words(line)
@@ -33,7 +35,7 @@ def generate():
                 continue
             
             # If the word is not already in the dictionary,
-            # add it
+            # add it only
             if word not in vocab:
                 vocab[word] = i
                 i += 1
@@ -60,6 +62,7 @@ def generate():
         file.write(f"{vocab[key]},{key}\n")
         
     # Close the file
+    print(f"Number of sentences loaded: {sents}")
     file.close()
 
 

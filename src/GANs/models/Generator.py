@@ -68,7 +68,7 @@ class Generator(nn.Module):
         # Softmax block for the output
         self.soft = nn.Sequential(
             nn.Linear(embedding_size, len(self.vocab.keys())),
-            nn.Softmax(-1),
+            nn.Softmax(dim=-1),
         ).to(device)
         
         # Potential Gumbel Linear block for the output
@@ -81,7 +81,7 @@ class Generator(nn.Module):
         else:
             self.dist = torch.distributions.uniform.Uniform(-1, 1)
 
-         # Model used to predict the legths of the model
+        # Model used to predict the legths of the model
         self.lenGen = nn.ModuleList([inTrans(embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
 
         # Linear layer used to decode the lengths
