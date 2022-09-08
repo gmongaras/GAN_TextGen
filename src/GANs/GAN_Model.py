@@ -316,6 +316,42 @@ class GAN_Model(nn.Module):
 
                 # Get the real data lengths
                 lens_real = self.getLens(real_X)
+                
+                # Get the variance
+                sampleSize = 100000
+                maxVariance = len(self.vocab)/10
+                minVariance = 0.1
+                variance = torch.linspace(maxVariance, minVariance, epochs)[epoch]
+                
+                # Iterate over all non-<PAD> tokens in the real data
+                # and spread the data distribution
+                for i in range(0, len(real_X)):
+                    for j in range(0, lens_real[i].cpu().item()):
+                        # Get the current distribution to spread
+                        curDist = real_X[i, j]
+                        
+                        # Get the argmax of the distribution
+                        mean = torch.argmax(curDist).float()
+                        
+                        # Get a normal distribution with a mean
+                        # of the current value and a variance of
+                        # the calculated variance
+                        N = torch.distributions.normal.Normal(mean, variance)
+                        
+                        # Sample the distribution
+                        S = N.sample([sampleSize]) # Sample
+                        S = S[torch.logical_and(S < len(self.vocab)-1, S > 0)] # Only get values in the desired range
+                        S = torch.round(S).long() # Discretize the sample
+                        
+                        # Get the distribution
+                        N_disc = torch.bincount(S, minlength=len(self.vocab)).float()
+                        
+                        # Make the values sum up to 1
+                        N_disc /= N_disc.sum()
+                        
+                        # The discrete distribution will now
+                        # replace the one-hot vector
+                        real_X[i, j] = N_disc.to(self.device)
 
                 # One hot encode the lengths
                 lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length)

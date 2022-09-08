@@ -31,14 +31,14 @@ from typing import Optional
 
 
 # General model parameters
-@click.option("--M_gen", "M_gen", type=int, default=8, help="Number of input noise embedding blocks", required=False)
-@click.option("--B_gen", "B_gen", type=int, default=4, help="Number of transformer blocks to encode the input sequence", required=False)
+@click.option("--M_gen", "M_gen", type=int, default=2, help="Number of input noise embedding blocks", required=False)
+@click.option("--B_gen", "B_gen", type=int, default=2, help="Number of transformer blocks to encode the input sequence", required=False)
 @click.option("--O_gen", "O_gen", type=int, default=2, help="Number of transformer blocks to get the output sequence", required=False)
-@click.option("--L_gen", "L_gen", type=int, default=4, help="Number of transformer blocks to encode the lengths", required=False)
+@click.option("--L_gen", "L_gen", type=int, default=2, help="Number of transformer blocks to encode the lengths", required=False)
 @click.option("--embedding_size_gen", "embedding_size_gen", type=int, default=64, help="Word embedding size for the generator", required=False)
 @click.option("--T_disc", "T_disc", type=int, default=2, help="Number of transformer blocks in each discriminator block", required=False)
-@click.option("--B_disc", "B_disc", type=int, default=8, help="Number of discriminator blocks in the discriminator", required=False)
-@click.option("--O_disc", "O_disc", type=int, default=4, help="Number of output MHA blocks for each transformer in the discrimiantor", required=False)
+@click.option("--B_disc", "B_disc", type=int, default=2, help="Number of discriminator blocks in the discriminator", required=False)
+@click.option("--O_disc", "O_disc", type=int, default=2, help="Number of output MHA blocks for each transformer in the discrimiantor", required=False)
 @click.option("--embedding_size_disc", "embedding_size_disc", type=int, default=64, help="Word embedding size for the discriminator", required=False)
 @click.option("--hiddenSize", "hiddenSize", type=int, default=512, help="Hidden linear size in the transformer blocks", required=False)
 @click.option("--batchSize", "batchSize", type=int, default=64, help="Batch size used to train the model", required=False)
