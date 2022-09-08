@@ -63,6 +63,63 @@ def wasserstein_gen(y_pred_gen):
 
 
 
+
+### Loss functions for GLS-GAN
+
+# Inputs:
+#   disc_real - Discriminator output on real data
+#   disc_fake - Discriminator output on fake data
+#   x_real - Real data sample
+#   x_fake - Fake data sample
+#   cost_slope - Slope of the Leaky ReLU in the cost function
+#   dist_funt - Function to use to calculate the distance
+def GLS_disc(disc_real, disc_fake, x_real, x_fake, cost_slope, dist_funct="l1"):
+    # If the data is 3D, flatten it to 2D
+    if len(x_real.shape) == 3:
+        x_real = torch.flatten(x_real, start_dim=1)
+        x_fake = torch.flatten(x_fake, start_dim=1)
+
+    # The distance between the real and fake distributions
+    if dist_funct == "l2":
+        dist = 0.05*torch.nn.PairwiseDistance(2)(x_real, x_fake)
+    else:
+        dist = 0.001*torch.nn.PairwiseDistance(1)(x_real, x_fake)
+    
+    # Return the loss
+    return torch.mean(torch.nn.LeakyReLU(cost_slope)(
+        disc_real - disc_fake + dist))
+    
+
+def GLS_disc_split(disc_real, disc_fake, x_real, x_fake, cost_slope, dist_funct="l1"):
+    # If the data is 3D, flatten it to 2D
+    if len(x_real.shape) == 3:
+        x_real = torch.flatten(x_real, start_dim=1)
+        x_fake = torch.flatten(x_fake, start_dim=1)
+
+    # The distance between the real and fake distributions
+    if dist_funct == "l2":
+        dist = 0.05*torch.nn.PairwiseDistance(2)(x_real, x_fake)
+    else:
+        dist = 0.001*torch.nn.PairwiseDistance(1)(x_real, x_fake)
+        
+    relu = torch.nn.LeakyReLU(cost_slope)
+    
+    # Return the loss values
+    return torch.mean(relu(disc_real)), \
+        -torch.mean(relu(disc_fake)), \
+        torch.mean(relu(dist))
+
+
+# Inputs:
+#   disc_fake - Discriminator output on fake data
+def GLS_gen(disc_fake):
+    return torch.mean(disc_fake)
+
+
+
+
+
+
 # Loss functions for the diffusion model
 def diff_disc(disc_real, disc_fake):
     return torch.mean(torch.log(disc_real)) + \

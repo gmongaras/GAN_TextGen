@@ -11,14 +11,12 @@ class MHAwithNorm(nn.Module):
     #   output_embedding - Size to encode the embeddings for both
     #                      input tensors.
     #   num_heads - Number of heads in the MHA module
-    #   mask - True to use a mask so the model doesn't look ahead,
-    #           False otherwise
-    def __init__(self, E_1, E_2, output_embedding, num_heads, mask=False):
+    def __init__(self, E_1, E_2, output_embedding, num_heads):
         super(MHAwithNorm, self).__init__()
         
         
         # MHA block
-        self.MHA = MHA(E_1, E_2, output_embedding, num_heads, mask)
+        self.MHA = MHA(E_1, E_2, output_embedding, num_heads)
         
         # Layer norm block
         self.LN = nn.LayerNorm(output_embedding)
@@ -37,4 +35,4 @@ class MHAwithNorm(nn.Module):
        O = self.MHA(X_1, X_2)
        
        # Return the normalized output
-       return self.LN(O.contiguous()) + X_2
+       return self.LN(O + X_2)

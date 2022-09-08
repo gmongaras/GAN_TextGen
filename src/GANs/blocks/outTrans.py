@@ -1,4 +1,3 @@
-import imp
 import torch
 from torch import nn
 from ..blocks.MHA import MHA
@@ -13,32 +12,37 @@ class outTrans(nn.Module):
     #         values in the second MHA block
     #   E_2 - Input embedding from the input into
     #         the beginning of the transformer
-    #   gausNoise - True to add pure gaussian noise in the B output blocks,
-    #               False to not add gaussian noise
+    #   useNorm - True to use a normal distribution for noise, False
+    #             to use
     #   num_heads - Number of heads in each MHA block
-    #   FF_embedding - embedding size of the output of the
-    #                  Feed-forward block
     #   device - Device to put tensors on
-    def __init__(self, E_1, E_2, gausNoise, num_heads, FF_embedding, device):
+    #   hidden_size - Hidden size of the linear layer
+    def __init__(self, E_1, E_2, useNorm, num_heads, device, hidden_size=512):
         super(outTrans, self).__init__()
         self.device = device
-        self.gausNoise = gausNoise
         
         # The first MHA module with a mask
-        self.MHA1 = MHA(E_2, E_2, E_2, num_heads, True).to(device)
+        self.MHA1 = MHA(E_2, E_2, E_2, num_heads).to(device)
         
         # Second MHA module without a mask and with an
         # input from a different source
         self.MHA2 = MHA(E_1, E_2, E_2, num_heads).to(device)
         
         # Feed-foward block after the MHA blocks
-        self.FF = nn.Linear(E_2, FF_embedding, device=device)
-        self.ReLU = nn.SiLU()
+        self.FF1 = nn.Linear(E_2, hidden_size, device=device)
+        self.Act = nn.GELU()
+        self.FF2 = nn.Linear(hidden_size, E_2, device=device)
         
         # Layer normalization blocks
         self.LN1 = nn.LayerNorm(E_2, device=device)
         self.LN2 = nn.LayerNorm(E_2, device=device)
-        self.LN3 = nn.LayerNorm(FF_embedding, device=device)
+        self.LN3 = nn.LayerNorm(E_2, device=device)
+
+        # Normal or uniform distribution for the model
+        if useNorm == True:
+            self.dist = torch.distributions.normal.Normal(0, 1)
+        else:
+            self.dist = torch.distributions.uniform.Uniform(-1, 1)
     
     
     # Input:
@@ -49,20 +53,20 @@ class outTrans(nn.Module):
     def forward(self, X_1, X_2):
         X = self.MHA1(X_2, X_2)
         X += X_2
-        X = self.LN1(X.contiguous())
+        X = self.LN1(X)
         
-        # Add gaussian noise if set to true
-        if self.gausNoise:
-            X += torch.rand((X.shape), requires_grad=True, device=self.device)
+        # Add noise using the given noise distribution
+        X += self.dist.sample(X.shape).float().to(self.device)
         
         X_saved = X.clone()
         X = self.MHA2(X_1, X)
         X += X_saved
-        X = self.LN2(X.contiguous())
+        X = self.LN2(X)
         
         X_saved = X.clone()
-        X = self.FF(X)
-        X = self.ReLU(X) + 0
+        X = self.FF1(X)
+        X = self.Act(X) + 0
+        X = self.FF2(X)
         X += X_saved
-        X = self.LN3(X.contiguous())
+        X = self.LN3(X)
         return X

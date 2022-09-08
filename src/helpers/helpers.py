@@ -42,7 +42,7 @@ def get_clean_words(Sentence):
     words = word_tokenize(Sentence)
     
     # Remove all punctuation
-    words = [word for word in words if word.isalpha()]
+    words = [word.lower() for word in words if word.isalpha()]
     
     # Return the words
     return words
@@ -63,16 +63,16 @@ def get_clean_words(Sentence):
 #   A list of the same size with encoded sentences as tensors
 def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device):
     # Get the encoder on the correct device
-    encoder.to(device)
+    try:
+        encoder.to(device)
+    except:
+        pass
 
     # Final tensor of encoded sentences
     encoded = []
-    
+
     # Get the encoded form of <END>
     end_enc = encoder(torch.tensor(vocab_inv["<END>"], device=device))
-    
-    # Get the encoded form of <START>
-    start_end = encoder(torch.tensor(vocab_inv["<START>"], device=device))
     
     # Iterate over all sentences
     i = 0
@@ -83,8 +83,8 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         # Has the sentence been encoded?
         enc = True
         
-        # List of encoded words starting with <START>
-        enc_words = [start_end]
+        # List of encoded words
+        enc_words = []
         
         # Get the words from the sentence
         words = get_clean_words(sentence)
@@ -107,10 +107,10 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         
         # If the word has not been encoded, an error happened, so
         # skip the sentence and delete it
-        if enc == False:
+        if enc == False or len(enc_words) == 0:
             del X[i]
             continue
-        
+
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
         
@@ -145,12 +145,9 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
 def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
     # Final tensor of encoded sentences
     encoded = []
-    
+
     # Get the encoded form of <END>
-    end_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
-    
-    # Get the encoded form of <START>
-    start_end = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<START>"]), len(vocab_inv))
+    end_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"], device=device))
     
     # Iterate over all sentences
     i = 0
@@ -161,8 +158,8 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
         # Has the sentence been encoded?
         enc = True
         
-        # List of encoded words starting with <START>
-        enc_words = [start_end]
+        # List of encoded words
+        enc_words = []
         
         # Get the words from the sentence
         words = get_clean_words(sentence)
@@ -185,10 +182,10 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
             
         # If the word has not been encoded, an error happened, so
         # skip the sentence and delete it
-        if enc == False:
+        if enc == False or len(enc_words) == 0:
             del X[i]
             continue
-        
+
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
         

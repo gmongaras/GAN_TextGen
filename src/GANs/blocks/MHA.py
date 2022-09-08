@@ -13,14 +13,9 @@ class MHA(nn.Module):
     #   output_embedding - Size to encode the embeddings for both
     #                      input tensors.
     #   num_heads - Number of heads in the MHA module
-    #   mask - True to use a mask so the model doesn't look ahead,
-    #           False otherwise
-    def __init__(self, E_1, E_2, output_embedding, num_heads, mask=False):
+    def __init__(self, E_1, E_2, output_embedding, num_heads):
         super(MHA, self).__init__()
         
-        
-        # Saved variables
-        self.mask = mask
         
         # Key, query, value weights
         self.value_weights = nn.Linear(E_1, output_embedding)

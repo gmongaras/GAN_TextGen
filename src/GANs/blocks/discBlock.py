@@ -12,11 +12,11 @@ class discBlock(nn.Module):
     #                    this block
     #   num_heads - Number of heads in the MHA module
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
-    def __init__(self, T, embedding_size, num_heads, pooling):
+    def __init__(self, T, embedding_size, num_heads, hiddenSize, pooling):
         super(discBlock, self).__init__()
         
         # The transformer blocks
-        self.trans = [inTrans(embedding_size, num_heads, embedding_size) for i in range(T)]
+        self.trans = [inTrans(embedding_size, num_heads, hiddenSize) for i in range(T)]
         self.trans = nn.Sequential(*self.trans)
         
         # Average pooling layer to
@@ -39,5 +39,8 @@ class discBlock(nn.Module):
         else:
             X = self.trans(X)
         if hasattr(self, 'pool'):
-            X = self.pool(X.permute(0, 2, 1)).permute(0, 2, 1)
+            # Using pooling only if the length of the
+            # sequence is greater than 1
+            if X.shape[1] > 1:
+                X = self.pool(X.permute(0, 2, 1)).permute(0, 2, 1)
         return X
