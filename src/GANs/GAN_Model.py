@@ -336,7 +336,7 @@ class GAN_Model(nn.Module):
                         # Get a normal distribution with a mean
                         # of the current value and a variance of
                         # the calculated variance
-                        N = torch.distributions.normal.Normal(mean, variance)
+                        N = torch.distributions.normal.Normal(mean.cpu(), variance.cpu())
                         
                         # Sample the distribution
                         S = N.sample([sampleSize]) # Sample

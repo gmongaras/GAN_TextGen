@@ -200,9 +200,9 @@ class Generator(nn.Module):
 
         # Get the length estimation from the second model
         # (N, S, E) -> (N, S, E)
-        lens = Y
+        lens = Y.clone().detach()
         for block in self.lenGen:
-            lens = block(lens.clone().detach())
+            lens = block(lens)
 
         # Decode the lengths
         # (N, S, E) -> (N, S, 1)

@@ -53,8 +53,9 @@ class Discriminator(nn.Module):
         ]).to(device)
         self.disc_head_L = nn.Linear(embedding_size, 1, device=device)
         
-        # Create the class token which will be a tensor of 1s
-        self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)
+        # Create the class token which will be a parameter
+        # initialized to random values
+        self.clsTok = nn.Parameter(torch.rand(batchSize, 1, embedding_size, device=device, requires_grad=True))
         
         # Final feed-forward layer
         self.out_FC = nn.Linear(embedding_size, 1, device=device)
