@@ -182,10 +182,10 @@ class GAN_Model(nn.Module):
         
         # Send the transformed and combined data through the
         # discriminator
-        disc_hat = self.discriminator(x_hat, lens_hat)
+        disc_hat = self.discriminator(x_tilde, lens_fake)
         
         # Get the gradients of the discriminator output
-        gradients = torch.autograd.grad(outputs=(disc_hat), inputs=(x_hat, lens_hat),
+        gradients = torch.autograd.grad(outputs=(disc_hat), inputs=(x_tilde, lens_fake),
                               grad_outputs=(torch.ones(disc_hat.size(), device=device)),
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
         gradients = gradients.view(gradients.size(0), -1)
@@ -354,7 +354,14 @@ class GAN_Model(nn.Module):
                         real_X[i, j] = N_disc.to(self.device)
 
                 # One hot encode the lengths
-                lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length)
+                lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length).float()
+
+                # Make the inputs into the discriminator loss variables
+                # for differentiation
+                real_X = torch.autograd.Variable(real_X, requires_grad=True)
+                fake_X = torch.autograd.Variable(fake_X, requires_grad=True)
+                lens_real = torch.autograd.Variable(lens_real, requires_grad=True)
+                lens_fake = torch.autograd.Variable(lens_fake, requires_grad=True)
 
                 # Get the gradient penalty
                 gradient_penalty = self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake)
@@ -364,7 +371,7 @@ class GAN_Model(nn.Module):
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences
-                disc_real = self.discriminator(real_X, lens_real.float(), masks)
+                disc_real = self.discriminator(real_X, lens_real, masks)
                 
                 # Get the discriminator loss
                 discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
