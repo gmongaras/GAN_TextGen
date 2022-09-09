@@ -55,7 +55,7 @@ from typing import Optional
 @click.option("--alpha", "alpha", type=float, default=0.00005, help="Model learning rate", required=False)
 @click.option("--Beta1", "Beta1", type=float, default=0.5, help="Adam beta 1 term", required=False)
 @click.option("--Beta2", "Beta2", type=float, default=0.9, help="Adam beta 2 term", required=False)
-@click.option("--device", "device", type=str, default="cpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
+@click.option("--device", "device", type=str, default="partgpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
 @click.option("--epochs", "epochs", type=int, default=10000, help="Number of epochs to train the model", required=False)
 @click.option("--n_D", "n_D", type=int, default=1, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
 @click.option("--saveSteps", "saveSteps", type=int, default=100, help="Number of steps until the model is saved", required=False)
@@ -136,7 +136,7 @@ def train(
     
     ### Load in the data ###
     sentences = []
-    m = 100   # Max number of sentences to load in
+    m = 100000   # Max number of sentences to load in
     i = 0
     with open(input_file, "r", encoding='utf-8') as file:
         for line in file:
