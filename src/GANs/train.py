@@ -52,7 +52,7 @@ from typing import Optional
 @click.option("--gen_outEnc_mode", "gen_outEnc_mode", type=str, default="norm", help="How should the outputs of the generator be encoded? (\"norm\" to use a softmax output or \"gumb\" to use a gumbel-softmax output)", required=False)
 @click.option("--embed_mode_gen", "embed_mode_gen", type=str, default="norm", help="Embedding mode for the generator (\"norm\" for normal Word2Vec embeddings or \"custom\" for custom embeddings)", required=False)
 @click.option("--embed_mode_disc", "embed_mode_disc", type=str, default="fc", help="Embedding mode for the discriminator (\"fc\" to use a fully-connected layer or \"pca\" to use PCA embeddings)", required=False)
-@click.option("--alpha", "alpha", type=float, default=0.00005, help="Model learning rate", required=False)
+@click.option("--alpha", "alpha", type=float, default=0.0005, help="Model learning rate", required=False)
 @click.option("--Beta1", "Beta1", type=float, default=0.5, help="Adam beta 1 term", required=False)
 @click.option("--Beta2", "Beta2", type=float, default=0.9, help="Adam beta 2 term", required=False)
 @click.option("--device", "device", type=str, default="partgpu", help="Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")", required=False)
@@ -183,7 +183,7 @@ def train(
     
     
     ### Training The Model ###
-    #model.loadModels("models", "gen_model - 100.pkl", "disc_model - 100.pkl")
+    #model.loadModels("models", "gen_model - 600.pkl", "disc_model - 100.pkl")
     model.train_model(sentences, epochs)
     print()
     

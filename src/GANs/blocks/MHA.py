@@ -18,9 +18,9 @@ class MHA(nn.Module):
         
         
         # Key, query, value weights
-        self.value_weights = nn.Linear(E_1, output_embedding)
+        self.value_weights = nn.Linear(E_2, output_embedding)
         self.key_weights = nn.Linear(E_1, output_embedding)
-        self.query_weights = nn.Linear(E_2, output_embedding)
+        self.query_weights = nn.Linear(E_1, output_embedding)
         
         # MHA module
         self.MultiHeadAtt = nn.MultiheadAttention(output_embedding, num_heads, batch_first=True)

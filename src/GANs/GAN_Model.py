@@ -375,8 +375,10 @@ class GAN_Model(nn.Module):
                 
                 # Get the discriminator loss
                 discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                #discLoss = wasserstein_disc(disc_real, disc_fake)
                 
                 discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                #discLoss_real, discLoss_fake, dist = (*wasserstein_disc_split(disc_real, disc_fake), torch.tensor(0))
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -417,6 +419,7 @@ class GAN_Model(nn.Module):
                 
                 # Get the generator loss
                 genLoss = GLS_gen(disc_fake)
+                #genLoss = wasserstein_gen(disc_fake)
 
                 
                 # Backpropogate the loss
