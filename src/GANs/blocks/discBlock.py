@@ -1,5 +1,7 @@
 from ..blocks.inTrans import inTrans
+import torch
 from torch import nn
+import numpy as np
 
 
 
@@ -8,15 +10,29 @@ from torch import nn
 class discBlock(nn.Module):
     # Inputs:
     #   T - The number of transformer blocks before pooling
-    #   embedding_size - The size of the embeddings of the input into
+    #   embedding_size_in - The size of the embeddings of the input into
+    #                    this block
+    #   embedding_size_out - The size of the embeddings of the output of
     #                    this block
     #   num_heads - Number of heads in the MHA module
     #   pooling - What pooling mode should be used? ("avg", "max", or "none")
-    def __init__(self, T, embedding_size, num_heads, hiddenSize, pooling):
+    def __init__(self, T, embedding_size_in, embedding_size_out, num_heads, hiddenSize, pooling):
         super(discBlock, self).__init__()
+
+        # Linearly increase the embedding size
+        Es = torch.linspace(embedding_size_in, embedding_size_out, T+1).int().numpy()
+
+        # Maximum number of heads for each transformer block where the max size is
+        # num_heads and the min size is 1
+        heads = [0 for i in range(0, len(Es))]
+        for i in range(0, T+1):
+            E = Es[i]
+            for v in range(1, min(num_heads+1, E+1)):
+                if E%v == 0:
+                    heads[i] = v
         
         # The transformer blocks
-        self.trans = [inTrans(embedding_size, num_heads, hiddenSize) for i in range(T)]
+        self.trans = [inTrans(Es[i], Es[i+1], heads[i], hiddenSize) for i in range(T)]
         self.trans = nn.Sequential(*self.trans)
         
         # Average pooling layer to

@@ -53,7 +53,7 @@ class Generator(nn.Module):
         self.generator = nn.ModuleList([outTrans(embedding_size, embedding_size, useNorm, num_heads, device, hiddenSize) for i in range(B)]).to(device)
         
         # Output embedding transformer blocks
-        self.outEmb = nn.ModuleList([inTrans(embedding_size, num_heads, hiddenSize) for i in range(O)]).to(device)
+        self.outEmb = nn.ModuleList([inTrans(embedding_size, embedding_size, num_heads, hiddenSize) for i in range(O)]).to(device)
         
         # If the embed_mode is "custom", use the custom embedding mode
         if embed_mode == "custom":
@@ -82,7 +82,7 @@ class Generator(nn.Module):
             self.dist = torch.distributions.uniform.Uniform(-1, 1)
 
         # Model used to predict the legths of the model
-        self.lenGen = nn.ModuleList([inTrans(embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
+        self.lenGen = nn.ModuleList([inTrans(embedding_size, embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
 
         # Linear layer used to decode the lengths
         self.lensDec_E = nn.Linear(embedding_size, 1, device=device)
@@ -141,6 +141,7 @@ class Generator(nn.Module):
         
         # The tokenzied output sentences
         out_sent = [[] for i in range(self.batchSize)]
+        lens_sent = [[] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(0, self.sequence_length):
@@ -161,6 +162,10 @@ class Generator(nn.Module):
             # Get the token from the output
             # (N, S, E) -> (N, 1, E)
             out_tok = output[:, tok]
+
+            # Save the intermediate output for the lens estimator
+            for i in range(self.batchSize):
+                lens_sent[i].append(out_tok[i])
             
             # Send the output through a softmax block
             # (N, 1, E) -> (N, 1, V)
@@ -172,9 +177,15 @@ class Generator(nn.Module):
             if (self.outEnc == "gumb"):
                 out_tok_soft = torch.nn.functional.gumbel_softmax(torch.log(torch.clamp(self.gumb_linear(out_tok), 0.00001, torch.inf)), dim=-1)
             
-            # Save the softmax output for the
+            # Save the softmax output for the discriminator
             for i in range(self.batchSize):
                 out_sent[i].append(out_tok_soft[i])
+
+             # Get the argmax of the output tokens
+            out_tok = torch.argmax(out_tok_soft, dim=-1)
+            
+            # Encode the output token
+            out_tok = self.Word2Vec(out_tok)
             
             # Add the new token to the output and add a new
             # seed to the sequence
@@ -190,17 +201,94 @@ class Generator(nn.Module):
         # Turn the output into a tensor
         out_sent = [torch.stack(sent) for sent in out_sent]
         out_sent = torch.stack(out_sent)
+        lens_sent = [torch.stack(out) for out in lens_sent]
+        lens_sent = torch.stack(lens_sent)
 
 
 
-        ## Feed the whole output into the generator.
-        ## Note: We are using the output with an attached graph
-        ## so that each outputted word is effected by the
-        ## gradient of the length token.
+
+
+
+
+
+
+
+        # # Initiailze the model output to <START> tokens
+        # Y = torch.broadcast_to(self.Word2Vec.to(self.device)(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int, device=self.device, requires_grad=False)), (self.batchSize, 1, self.embedding_size)).clone()
+        
+        # # Get positional encodings for all tokens including future
+        # # tokens that will be generated
+        # posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
+        
+        # # Add the positional encodings to the input tokens
+        # Y += posEnc[:, 0:1]
+        
+        # # The tokenzied output sentences
+        # t = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<START>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
+        # t = t.float().to(self.device)
+        # t.requires_grad = True
+        # out_sent = [[t] for i in range(self.batchSize)]
+        
+        # # Iterate to generate a sentence of new words
+        # for tok in range(1, self.sequence_length):
+        #     # Send the output through the output decoder
+        #     output = Y
+        #     for block in self.generator:
+        #         output = block(w[:, 0:Y.shape[1]], output)
+                
+        #     # Get the token from the output
+        #     out_tok = output[:, tok-1]
+            
+        #     # Send the output through a softmax block
+        #     out_tok_soft = self.soft(out_tok)
+            
+        #     # Get the argmax of the output tokens
+        #     out_tok = torch.argmax(out_tok_soft, dim=-1)
+            
+        #     # Save the softmax output
+        #     for i in range(self.batchSize):
+        #         out_sent[i].append(out_tok_soft[i])
+        #     #    #out_sent[i].append(self.vocab[out_tok[i].detach().item()])
+            
+        #     # Encode the output token
+        #     out_tok = self.Word2Vec(out_tok)
+            
+        #     # Save the tokenized new word
+        #     #for i in range(self.batchSize):
+        #     #    out_sent[i].append(out_tok[i])
+            
+        #     # Add the new token to the output
+        #     #Y = Y.clone()
+        #     #Y[:, tok] = out_tok
+        #     Y = torch.cat((Y, torch.unsqueeze(out_tok, dim=1)), dim=1)
+        #     Y[:, tok] += posEnc[:, tok]
+        
+        # # Turn the output into a tensor
+        # out_sent = [torch.stack(sent) for sent in out_sent]
+        # out_sent = torch.stack(out_sent)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        # Feed the whole output into the generator.
+        # Note: We are using the output with an attached graph
+        # so that each outputted word is effected by the
+        # gradient of the length token.
 
         # Get the length estimation from the second model
         # (N, S, E) -> (N, S, E)
-        lens = Y.clone().detach()
+        lens = lens_sent.clone().detach()
         for block in self.lenGen:
             lens = block(lens)
 
