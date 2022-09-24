@@ -3,6 +3,7 @@ from torch import nn
 import torch
 import os
 from ..blocks.MHAwithNorm import MHAwithNorm
+import math
 
 
 
@@ -33,6 +34,12 @@ class Discriminator(nn.Module):
         self.outMode = outMode.lower()
         self.embed_mode = embed_mode.lower()
         self.embedding_size = embedding_size
+
+        # self.LL1 = nn.Linear(vocab_size, int(math.sqrt(vocab_size)), device=device)
+        # self.LL2 = nn.Linear(int(math.sqrt(vocab_size)), embedding_size, device=device)
+        self.LL1 = nn.Linear(vocab_size, vocab_size//100, device=device)
+        self.LL2 = nn.Linear(vocab_size//100, vocab_size//1000, device=device)
+        self.LL3 = nn.Linear(vocab_size//1000, embedding_size, device=device)
         
         # If the embed mode is PCA, use the PCA algorithm to transform
         # the input of shape [vocab size] to the shape [embedding_size]
@@ -43,18 +50,26 @@ class Discriminator(nn.Module):
         # Create the discriminator backbone. Note, each
         # block halves the sequence length if pooling is used
         # (NxS+1xE) -> (NxLxE)
-        blocks = [discBlock(T, embedding_size, num_heads, hiddenSize, pooling) for i in range(B)]
+        blocks = [discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, pooling) for i in range(B)]
         self.disc_backbone = nn.Sequential(*blocks).to(device)
+
+        # Create the discriminator backbone for the lengths. Note, each
+        # block halves the sequence length if pooling is used
+        # (NxSx1) -> (NxLxE)
+        Es = torch.linspace(1, embedding_size, B+1).int().numpy()
+        blocks = [discBlock(T, Es[i], Es[i+1], num_heads, hiddenSize, pooling) for i in range(B)]
+        self.disc_backbone2 = nn.Sequential(*blocks).to(device)
         
         # The discriminator classifier head
         # (NxL+1xE) -> (N)
         self.disc_head_B = nn.Sequential(*[
-            discBlock(T, embedding_size, num_heads, hiddenSize, "none") for i in range(0, O)
+            discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, "none") for i in range(0, O)
         ]).to(device)
         self.disc_head_L = nn.Linear(embedding_size, 1, device=device)
         
-        # Create the class token which will be a tensor of 1s
-        self.clsTok = torch.ones(batchSize, 1, embedding_size, device=device, requires_grad=False)
+        # Create the class token which will be a parameter
+        # initialized to random values
+        self.clsTok = nn.Parameter(torch.rand(batchSize, 1, embedding_size, device=device, requires_grad=True))
         
         # Final feed-forward layer
         self.out_FC = nn.Linear(embedding_size, 1, device=device)
@@ -80,21 +95,36 @@ class Discriminator(nn.Module):
         if self.embed_mode == "pca":
             X = torch.pca_lowrank(X, self.embedding_size)[0]
         else:
-            X = self.encodingTransform(X)
+            pass
+            #X = self.encodingTransform(X)
 
-        # Encode the lengths from shape S to E
-        lens = self.lensEnc(lens)
+        X = self.LL1(X)
+        X = self.LL2(X)
+        X = self.LL3(X)
 
-        # Append the lengths to the beginning of the inputs
-        X = torch.cat((lens.unsqueeze(1), X), dim=1)
+        # # Encode the lengths from shape S to E
+        # lens = self.lensEnc(lens)
+
+        # # Append the lengths to the beginning of the inputs
+        # X = torch.cat((lens.unsqueeze(1), X), dim=1)
+
+        # Append the langths to the end of the inputs
+        # X = torch.cat((X, lens.unsqueeze(-1)), dim=-1)
         
-        # Send the input through the backbone
+        # Send the inputs through the backbone
         if masks != None:
             X = self.disc_backbone[0](X, masks)
             for b in self.disc_backbone[1:]:
                 X = b(X)
         else:
             X = self.disc_backbone(X)
+
+        # Send the lengths through the backbone
+        # Shapes: (NxSx1) -> (NxSxE)
+        lens = self.disc_backbone2(lens.unsqueeze(-1))
+
+        # Combine the lengths and the input
+        X = X+lens
         
         # Add the class token to the output of the backbone
         X = torch.cat((self.clsTok[:X.shape[0]], X), dim=1)

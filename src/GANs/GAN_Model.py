@@ -148,6 +148,10 @@ class GAN_Model(nn.Module):
 
         # Uniform distribution for the gradient penalty
         self.unif = torch.distributions.uniform.Uniform(0, 1)
+
+        # Dynamic generator training estimation
+        self.G_n = 1
+        self.ROC = 1
         
         
     def one_hot(a, num_classes):
@@ -316,9 +320,52 @@ class GAN_Model(nn.Module):
 
                 # Get the real data lengths
                 lens_real = self.getLens(real_X)
+                
+                # Get the variance
+                sampleSize = 100000
+                maxVariance = len(self.vocab)/100
+                minVariance = 0.1
+                variance = torch.linspace(maxVariance, minVariance, epochs)[epoch]
+                
+                # # Iterate over all non-<PAD> tokens in the real data
+                # # and spread the data distribution
+                # for i in range(0, len(real_X)):
+                #     for j in range(0, lens_real[i].cpu().item()):
+                #         # Get the current distribution to spread
+                #         curDist = real_X[i, j]
+                        
+                #         # Get the argmax of the distribution
+                #         mean = torch.argmax(curDist).float()
+                        
+                #         # Get a normal distribution with a mean
+                #         # of the current value and a variance of
+                #         # the calculated variance
+                #         N = torch.distributions.normal.Normal(mean.cpu(), variance.cpu())
+                        
+                #         # Sample the distribution
+                #         S = N.sample([sampleSize]) # Sample
+                #         S = S[torch.logical_and(S < len(self.vocab)-1, S > 0)] # Only get values in the desired range
+                #         S = torch.round(S).long() # Discretize the sample
+                        
+                #         # Get the distribution
+                #         N_disc = torch.bincount(S, minlength=len(self.vocab)).float()
+                        
+                #         # Make the values sum up to 1
+                #         N_disc /= N_disc.sum()
+                        
+                #         # The discrete distribution will now
+                #         # replace the one-hot vector
+                #         real_X[i, j] = N_disc.to(self.device)
 
                 # One hot encode the lengths
-                lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length)
+                lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length).float()
+
+                # Make the inputs into the discriminator loss variables
+                # for differentiation
+                real_X = torch.autograd.Variable(real_X, requires_grad=True)
+                fake_X = torch.autograd.Variable(fake_X, requires_grad=True)
+                lens_real = torch.autograd.Variable(lens_real, requires_grad=True)
+                lens_fake = torch.autograd.Variable(lens_fake, requires_grad=True)
 
                 # Get the gradient penalty
                 gradient_penalty = self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake)
@@ -328,12 +375,14 @@ class GAN_Model(nn.Module):
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences
-                disc_real = self.discriminator(real_X, lens_real.float(), masks)
+                disc_real = self.discriminator(real_X, lens_real, masks)
                 
                 # Get the discriminator loss
-                discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                #discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                discLoss = wasserstein_disc(disc_real, disc_fake)
                 
-                discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                #discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                discLoss_fake, discLoss_real, dist = (*wasserstein_disc_split(disc_real, disc_fake), torch.tensor(0))
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
@@ -349,6 +398,18 @@ class GAN_Model(nn.Module):
                 gradient_penalty = gradient_penalty.cpu().detach().item()
                 del disc_sub, real_X, lens_real, lens_fake
             
+
+            # Dynamic Generator N Estimation
+            i = 10
+            if len(self.MREs) > i-1 and epoch%i == 0:
+                d_MRE = (MRE.cpu().item() - self.MREs[-(i-1)])/i
+                d_MRE += 0.5
+                self.ROC = max(1, self.ROC + d_MRE)
+                import math
+                self.G_n = math.ceil(self.ROC)
+                print(self.ROC)
+
+
             # Train the generator next
             self.optim_gen.zero_grad()
             for i in range(0, 1 if self.dynamic_n == False else (1 if r_d <= self.Lambda_n*r_g or L_p_g == None else 0)):
@@ -373,7 +434,8 @@ class GAN_Model(nn.Module):
                 disc_fake = self.discriminator(fake_X, lens_fake, masks)
                 
                 # Get the generator loss
-                genLoss = GLS_gen(disc_fake)
+                #genLoss = GLS_gen(disc_fake)
+                genLoss = wasserstein_gen(disc_fake)
 
                 
                 # Backpropogate the loss
