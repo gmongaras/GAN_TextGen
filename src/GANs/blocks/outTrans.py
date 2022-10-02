@@ -52,21 +52,21 @@ class outTrans(nn.Module):
     #     the output sentence word embeddings
     def forward(self, X_1, X_2):
         X = self.MHA1(X_2, X_2)
-        X += X_2
         X = self.LN1(X)
+        X += X_2
         
         # Add noise using the given noise distribution
         X += self.dist.sample(X.shape).float().to(self.device)
         
         X_saved = X.clone()
         X = self.MHA2(X_1, X)
-        X += X_saved
         X = self.LN2(X)
+        X += X_saved
         
         X_saved = X.clone()
         X = self.FF1(X)
         X = self.Act(X) + 0
         X = self.FF2(X)
-        X += X_saved
         X = self.LN3(X)
+        X += X_saved
         return X

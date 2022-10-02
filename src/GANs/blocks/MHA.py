@@ -18,9 +18,9 @@ class MHA(nn.Module):
         
         
         # Key, query, value weights
-        self.value_weights = nn.Linear(E_2, output_embedding)
-        self.key_weights = nn.Linear(E_1, output_embedding)
-        self.query_weights = nn.Linear(E_1, output_embedding)
+        self.value_weights = nn.Linear(E_2, output_embedding, bias=False)
+        self.key_weights = nn.Linear(E_1, output_embedding, bias=False)
+        self.query_weights = nn.Linear(E_1, output_embedding, bias=False)
         
         # MHA module
         self.MultiHeadAtt = nn.MultiheadAttention(output_embedding, num_heads, batch_first=True)
@@ -37,9 +37,13 @@ class MHA(nn.Module):
     #   A 3-D tensor of shape (N, S, output_embedding)
     def forward(self, X_1, X_2, masks=None):
         # Get the key, query, value embedings
-        value = self.value_weights(X_2)
-        query = self.query_weights(X_1)
-        key = self.key_weights(X_1)
+        # value = self.value_weights(X_2)
+        # query = self.query_weights(X_1)
+        # key = self.key_weights(X_1)
+
+        value = X_2
+        query = X_1
+        key = X_1
         
         # Get the MHA value and return it
-        return self.MultiHeadAtt(query, key, value, key_padding_mask=masks, need_weights=False)[0]
+        return self.MultiHeadAtt(query, key, value, attn_mask=masks, need_weights=False)[0]

@@ -35,11 +35,12 @@ class Discriminator(nn.Module):
         self.embed_mode = embed_mode.lower()
         self.embedding_size = embedding_size
 
-        # self.LL1 = nn.Linear(vocab_size, int(math.sqrt(vocab_size)), device=device)
-        # self.LL2 = nn.Linear(int(math.sqrt(vocab_size)), embedding_size, device=device)
-        self.LL1 = nn.Linear(vocab_size, vocab_size//100, device=device)
-        self.LL2 = nn.Linear(vocab_size//100, vocab_size//1000, device=device)
-        self.LL3 = nn.Linear(vocab_size//1000, embedding_size, device=device)
+
+        # Discriminator lookup table (linear without a bias)
+        self.Hot2Enc = nn.Linear(vocab_size, embedding_size, bias=False, device=device)
+        # self.LL1 = nn.Linear(vocab_size, vocab_size//100, device=device)
+        # self.LL2 = nn.Linear(vocab_size//100, vocab_size//1000, device=device)
+        # self.LL3 = nn.Linear(vocab_size//1000, embedding_size, device=device)
         
         # If the embed mode is PCA, use the PCA algorithm to transform
         # the input of shape [vocab size] to the shape [embedding_size]
@@ -98,9 +99,22 @@ class Discriminator(nn.Module):
             pass
             #X = self.encodingTransform(X)
 
-        X = self.LL1(X)
-        X = self.LL2(X)
-        X = self.LL3(X)
+        # Encode the words
+        X = self.Hot2Enc(X)
+
+        # X = self.LL1(X)
+        # X = self.LL2(X)
+        # X = self.LL3(X)
+
+        # # Get the lengths as numerical values
+        # lens_num = torch.argmax(lens, dim=-1).cpu().detach()
+
+        # # Replace the <PAD> tokens with 0 so that the
+        # # discriminator doesn't worry about encoding it
+        # for i in range(0, X.shape[0]):
+        #     x = X[i]
+        #     x[lens_num[i].item()+1:] = 0
+        #     X[i] = x
 
         # # Encode the lengths from shape S to E
         # lens = self.lensEnc(lens)
@@ -113,7 +127,7 @@ class Discriminator(nn.Module):
         
         # Send the inputs through the backbone
         if masks != None:
-            X = self.disc_backbone[0](X, masks)
+            X = self.disc_backbone[0](X, masks) # Only mask the first values
             for b in self.disc_backbone[1:]:
                 X = b(X)
         else:

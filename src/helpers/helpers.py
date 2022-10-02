@@ -246,9 +246,12 @@ def addPadding(X, vocab_inv, sequence_length, encoder):
 #   vocab_inv - Inverted vocab where words map to their values
 #   sequence_length - Length to encode each sequence to
 def addPadding_one_hot(X, vocab_inv, sequence_length):
-    # The padding tensor
-    #pad_enc = encoder(torch.tensor(vocab_inv["<PAD>"]))
-    pad_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<PAD>"]), len(vocab_inv))
+    # The padding tensor. Note <END> is used as a temp variable
+    # since <PAD> is not in the vocab anymore
+    pad_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
+
+    # Instead of padding, use 0s
+    pad_enc = pad_enc*0
     
     # The new padded tensor
     X_padded = torch.zeros(len(X), sequence_length, pad_enc.shape[-1])

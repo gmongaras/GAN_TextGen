@@ -288,7 +288,7 @@ class Generator(nn.Module):
 
         # Get the length estimation from the second model
         # (N, S, E) -> (N, S, E)
-        lens = lens_sent.clone().detach()
+        lens = lens_sent
         for block in self.lenGen:
             lens = block(lens)
 
@@ -298,11 +298,11 @@ class Generator(nn.Module):
         # (N, S) -> (N, S)
         lens = self.lensDec_S(lens)
 
-        # For each length, replace the values with PAD tokens
-        pad_tok = torch.nn.functional.one_hot(torch.tensor(self.vocab_inv["<PAD>"], dtype=torch.int64, device=self.device, requires_grad=False), len(self.vocab))
-        pad_tok = pad_tok.float().to(self.device)
+        # For each length, replace the value after the estimated
+        # length with 0s. So no gradient and the value will not contribute to
+        # the linear layer in the discriminator
         for i in range(0, lens.shape[0]):
-            out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] = pad_tok.clone()
+            out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] *= 0
 
         
         # Return the output:

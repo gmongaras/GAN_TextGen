@@ -38,19 +38,20 @@ class inTrans(nn.Module):
     def forward(self, X, masks=None):
         X_saved = X.clone()
         X = self.MHA(X, X, masks)
-        X += X_saved
         X = self.LN1(X)
+        X += X_saved
 
         # No residual if the output is different from the input
         if self.E_I != self.E_O:
             X = self.FF1(X)
             X = self.Act(X) + 0
             X = self.FF2(X)
+            X = self.LN2(X)
         else:
             X_saved = X.clone()
             X = self.FF1(X)
             X = self.Act(X) + 0
             X = self.FF2(X)
+            X = self.LN2(X)
             X += X_saved
-        X = self.LN2(X)
         return X
