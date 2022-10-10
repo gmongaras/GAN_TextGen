@@ -81,13 +81,19 @@ class Generator(nn.Module):
         else:
             self.dist = torch.distributions.uniform.Uniform(-1, 1)
 
+        # Used to embed the sentecen from V -> E for the lengths
+        self.lensEmbedding = nn.Linear(len(vocab), embedding_size, device=device, bias=False)
+
+        # Token used to predict the lengths
+        self.lensTok = nn.Parameter(torch.rand(batchSize, 1, embedding_size, device=device, requires_grad=True))
+
         # Model used to predict the legths of the model
-        self.lenGen = nn.ModuleList([inTrans(embedding_size, embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
+        self.lenGen = nn.Sequential(*[inTrans(embedding_size, embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
 
         # Linear layer used to decode the lengths
         self.lensDec_E = nn.Linear(embedding_size, 1, device=device)
         self.lensDec_S = nn.Sequential(
-            nn.Linear(sequence_length, self.sequence_length, device=device),
+            nn.Linear(embedding_size, sequence_length, device=device),
             nn.Softmax(dim=-1),
         ).to(device)
     
@@ -111,12 +117,12 @@ class Generator(nn.Module):
             self.eval()
         
         # Generate some noise
-        noise = self.dist.sample((self.batchSize, self.sequence_length)).float().to(self.device)
+        noise = self.dist.sample((self.batchSize, self.sequence_length, self.embedding_size)).float().to(self.device)
         noise.requires_grad = True
         
         # Send the noise through the input blocks
         w = self.inEmb(noise)
-        w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.embedding_size)
+        #w = torch.unsqueeze(w, dim=-1).repeat(1, 1, self.embedding_size)
         
         # Depending on the embedding mode, pick how to
         # Get a forward pass from the network
@@ -288,21 +294,38 @@ class Generator(nn.Module):
 
         # Get the length estimation from the second model
         # (N, S, E) -> (N, S, E)
-        lens = lens_sent
-        for block in self.lenGen:
-            lens = block(lens)
+        # lens = lens_sent.clone().detach()
+        # for block in self.lenGen:
+        #     lens = block(lens)
+
+        # # Decode the lengths
+        # # (N, S, E) -> (N, S, 1)
+        # lens = self.lensDec_E(lens).squeeze()
+        # # (N, S) -> (N, S)
+        # lens = self.lensDec_S(lens)
+
+
+        # Embed the sentence for the lengths
+        # (N, S, V) -> (N, S, E)
+        lens = self.lensEmbedding(out_sent.clone().detach())
+
+        # Get the length estimation from the second model
+        # (N, S+1, E) -> (N, S+1, E)
+        #lens = lens_sent.clone().detach()
+        lens = torch.cat((self.lensTok, lens), dim=1)
+        lens = self.lenGen(lens)
 
         # Decode the lengths
-        # (N, S, E) -> (N, S, 1)
-        lens = self.lensDec_E(lens).squeeze()
-        # (N, S) -> (N, S)
+        # (N, S, E) -> (N, E)
+        lens = lens[:, 0].squeeze()
+        # (N, E) -> (N, S)
         lens = self.lensDec_S(lens)
 
         # For each length, replace the value after the estimated
         # length with 0s. So no gradient and the value will not contribute to
         # the linear layer in the discriminator
-        for i in range(0, lens.shape[0]):
-            out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] *= 0
+        # for i in range(0, lens.shape[0]):
+        #     out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] *= 0
 
         
         # Return the output:

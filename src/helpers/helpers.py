@@ -73,6 +73,9 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
 
     # Get the encoded form of <END>
     end_enc = encoder(torch.tensor(vocab_inv["<END>"], device=device))
+
+    # Get the encoded form of <START>
+    start_enc = encoder(torch.tensor(vocab_inv["<START>"], device=device))
     
     # Iterate over all sentences
     i = 0
@@ -111,6 +114,9 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
             del X[i]
             continue
 
+        # Add an <START> token to the sequence
+        enc_words = [start_enc] + enc_words
+
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
         
@@ -148,6 +154,9 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
 
     # Get the encoded form of <END>
     end_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"], device=device))
+
+    # Get the encoded form of <START>
+    start_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<START>"], device=device))
     
     # Iterate over all sentences
     i = 0
@@ -185,6 +194,9 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
         if enc == False or len(enc_words) == 0:
             del X[i]
             continue
+
+        # Add a <START> token to the sequence
+        enc_words = [start_enc] + enc_words
 
         # Add an <END> token to the sequence
         enc_words.append(end_enc)
@@ -251,7 +263,7 @@ def addPadding_one_hot(X, vocab_inv, sequence_length):
     pad_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
 
     # Instead of padding, use 0s
-    pad_enc = pad_enc*0
+    # pad_enc = pad_enc*0
     
     # The new padded tensor
     X_padded = torch.zeros(len(X), sequence_length, pad_enc.shape[-1])

@@ -37,7 +37,7 @@ class Discriminator(nn.Module):
 
 
         # Discriminator lookup table (linear without a bias)
-        self.Hot2Enc = nn.Linear(vocab_size, embedding_size, bias=False, device=device)
+        self.sent_lookup = nn.Linear(vocab_size, embedding_size, bias=False, device=device)
         # self.LL1 = nn.Linear(vocab_size, vocab_size//100, device=device)
         # self.LL2 = nn.Linear(vocab_size//100, vocab_size//1000, device=device)
         # self.LL3 = nn.Linear(vocab_size//1000, embedding_size, device=device)
@@ -58,7 +58,7 @@ class Discriminator(nn.Module):
         # block halves the sequence length if pooling is used
         # (NxSx1) -> (NxLxE)
         Es = torch.linspace(1, embedding_size, B+1).int().numpy()
-        blocks = [discBlock(T, Es[i], Es[i+1], num_heads, hiddenSize, pooling) for i in range(B)]
+        blocks = [discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, pooling) for i in range(B)]
         self.disc_backbone2 = nn.Sequential(*blocks).to(device)
         
         # The discriminator classifier head
@@ -77,8 +77,15 @@ class Discriminator(nn.Module):
         self.Tanh = nn.Tanh().to(device)
         self.Sigmoid = nn.Sigmoid().to(device)
 
+        # Lookup table for the length, just like for the vocab
+        self.lens_lookup = nn.Linear(sequence_length, sequence_length, bias=False, device=device)
+
         # Linear layer used to encode the lengths
         self.lensEnc = nn.Linear(sequence_length, embedding_size, device=device)
+
+        # Uniform distribution between 0.1 and 0.9 to randomly weigh
+        # the lengths and the sentences
+        self.unif = torch.distributions.uniform.Uniform(0.001, 0.999)
     
     
     
@@ -100,7 +107,7 @@ class Discriminator(nn.Module):
             #X = self.encodingTransform(X)
 
         # Encode the words
-        X = self.Hot2Enc(X)
+        X = self.sent_lookup(X)
 
         # X = self.LL1(X)
         # X = self.LL2(X)
@@ -124,6 +131,23 @@ class Discriminator(nn.Module):
 
         # Append the langths to the end of the inputs
         # X = torch.cat((X, lens.unsqueeze(-1)), dim=-1)
+
+
+
+
+
+
+
+
+        # Lots of spacing so I know to remove this line later
+        masks = None
+
+
+
+
+
+
+
         
         # Send the inputs through the backbone
         if masks != None:
@@ -133,12 +157,34 @@ class Discriminator(nn.Module):
         else:
             X = self.disc_backbone(X)
 
+        # Encode the lengths
+        lens = self.lens_lookup(lens)
+
         # Send the lengths through the backbone
         # Shapes: (NxSx1) -> (NxSxE)
-        lens = self.disc_backbone2(lens.unsqueeze(-1))
+        lens = lens.unsqueeze(-1).repeat(1, 1, self.embedding_size)
+        lens = self.disc_backbone2(lens)
 
-        # Combine the lengths and the input
-        X = X+lens
+        # # Get a sample from the uniform distribuion to weight
+        # # the sentences and lengths.
+        # #
+        # # Why add a little bit of noise? Without noise, the lengths
+        # # stayed at a single value which was good enough, then the
+        # # original generator modeled that static value. Hopefully
+        # # a little bit of noise in the discriminator will help it
+        # # learn to weigh the lengths greater than the sentences sometimes
+        # samp = self.unif.sample([lens.shape[0]]).to(self.device)
+
+        # # Combine the lengths and the input
+        # X = (1-samp)*X+samp*lens
+
+        # Normalize the lengths and X values so that the
+        # discriminator doesn't rely on one more than the other
+        # X = X/torch.norm(X, dim=-1)
+        # lens = lens/torch.norm(lens, dim=-1)
+
+        # Combine the sentence encodings and length encodings
+        X = X+lens*0
         
         # Add the class token to the output of the backbone
         X = torch.cat((self.clsTok[:X.shape[0]], X), dim=1)

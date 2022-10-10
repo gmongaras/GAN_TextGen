@@ -181,7 +181,7 @@ class GAN_Model(nn.Module):
         x_hat = epsilon*x + (1-epsilon)*x_tilde
 
         # Masks are the combination of the two masks
-        masks_hat = torch.logical_or(masks_real, masks_fake).clone().detach()
+        masks_hat = torch.logical_and(masks_real, masks_fake).clone().detach()
 
         # We only want the gradients of the discriminator
         x_hat = x_hat.clone().detach()
@@ -337,6 +337,9 @@ class GAN_Model(nn.Module):
             # Train the discriminator first or if dynamic_n is used and
             # r_d > r_g
             self.optim_disc.zero_grad()
+            disc_loss_cum = 0
+            disc_fake_cum = 0
+            disc_real_cum = 0
             for i in range(0, max(self.n_D, 1) if self.dynamic_n == False else 1):
                 # Sample data for the discriminator
                 disc_sub = disc_nums[:self.batchSize]
@@ -469,6 +472,11 @@ class GAN_Model(nn.Module):
                     self.optim_disc.step()
                 self.optim_disc.zero_grad()
 
+                # Loss cumulation
+                disc_loss_cum += discLoss.cpu().detach().item()
+                disc_fake_cum += discLoss_fake.cpu().detach().item()
+                disc_real_cum += discLoss_real.cpu().detach().item()
+
                 # Delete all discriminator stuff as its no longer needed
                 discCost = discCost.detach()
                 gradient_penalty = gradient_penalty.cpu().detach().item()
@@ -540,18 +548,23 @@ class GAN_Model(nn.Module):
             
             
             # Flip the maximizing values to represent the actual value
-            discLoss_real *= -1
+            disc_real_cum *= -1
             genLoss *= -1
+
+            # Average the losses
+            disc_loss_cum /= self.n_D
+            disc_real_cum /= self.n_D
+            disc_fake_cum /= self.n_D
             
             
             # Save the loss values
             self.genLoss.append(genLoss.item())
-            self.discLoss.append(discLoss.item())
-            self.discLoss_real.append(discLoss_real.item())
-            self.discLoss_fake.append(discLoss_fake.item())
+            self.discLoss.append(disc_loss_cum)
+            self.discLoss_real.append(disc_real_cum)
+            self.discLoss_fake.append(disc_fake_cum)
             self.MREs.append(MRE.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(discLoss_real.item(), 4)}     Discriminator Fake: {round(discLoss_fake.item(), 4)}    Discriminator Loss: {round(discLoss.item(), 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}    MRE: {round(MRE.item(), 4)}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(disc_real_cum, 4)}     Discriminator Fake: {round(disc_fake_cum, 4)}    Discriminator Loss: {round(disc_loss_cum, 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}    MRE: {round(MRE.item(), 4)}", end="")
             if self.dynamic_n:
                 print(f"    r_g: {round(r_g, 4)}    r_d: {round(r_d, 4)}", end="")
             print()
