@@ -7,47 +7,61 @@ import random
 def generate():
     vocabFile = "data/Text2/data.txt"
     outFile = "vocab_text2.csv"
-    limit = 68600
+    outTxtFile = "data/Text2/data2.txt"
+    limit = 70000
     randomize = True # Randomize the vocab to stray from bias
     
     
     # The created vocab as each word is seen
-    vocab = {"<START>": 0, "<END>": 2, "<NEXT>": 3}
+    vocab = {"<START>": 0, "<END>": 2}
     
     i = len(vocab)
     sents = 0
     
     # Iterate over all lines in the file
     file = open(vocabFile, "r", encoding="utf-8")
+    txtFile = open(outTxtFile, "w", encoding="utf-8")
     for line in file:
-        sents += 1
-        
         # Get the words
-        words = get_clean_words(line)
+        line = line.strip()
+        words, prop = get_clean_words(line)
+
+        # Has the limit been reached?
+        limitIssue = False
         
         # Breakup the line into spaces and store any new words
         for word in words:
             # Make the word lowercased
-            word = word.lower()
+            word = word.lower().strip()
             
             # If the word is blank, don't add it
             if len(word) == 0:
                 continue
             
-            # If the word is not already in the dictionary,
-            # add it only
-            if word not in vocab:
-                vocab[word] = i
-                i += 1
-            
             # Check if the limit has been reached
-            if len(vocab.keys()) > limit:
-                break
+            if len(vocab.keys()) >= limit:
+                # Is the word in the vocab?
+                if word not in vocab:
+                    limitIssue = True
+                    break
+
+            # If the limit hasn't been reached, add the word to
+            # the vocab if it isn't already in there
+            else:
+                if word not in vocab:
+                    vocab[word] = i
+                    i += 1
+
+        # If there isn't a sentence issue, save the senence
+        if not limitIssue:
+            txtFile.write(" ".join(words) + "\n")
+            sents += 1
         
         # Check if the limit has been reached
-        if len(vocab.keys()) > limit:
-            break
+        # if len(vocab.keys()) > limit:
+        #     break
     file.close()
+    txtFile.close()
 
     # Shuffle the vocab
     if randomize:

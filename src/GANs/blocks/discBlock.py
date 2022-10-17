@@ -50,9 +50,9 @@ class discBlock(nn.Module):
     #   3-D tensor of shape (N, S//2, 2)
     def forward(self, X, masks=None):
         if masks != None:
-            X = self.trans[0](X, masks) # Only mask the first value
-            for b in self.trans[1:]:
-                X = b(X)
+            # Mask all blocks
+            for b in self.trans:
+                X = b(X, masks)
         else:
             X = self.trans(X)
         if hasattr(self, 'pool'):

@@ -53,8 +53,8 @@ class GAN_Model(nn.Module):
     #   B_disc - Number of discriminator blocks in the discriminator
     #   O_disc - Number of output MHA blocks in the discrimiantor
     #   hiddenSize - Hidden linear size in the transformer blocks
-    #   useNorm - True to use a normal distribution for noise, False
-    #             to use a uniform distribution
+    #   noiseDist - Distribution to sample noise from. Can be one of 
+    #               (\"norm\", \"unif\", \"trunc\" (for truncated normal))
     #   costSlope - The slope of the GLS-GAN cost function
     #   batchSize - Size to bach data into
     #   embedding_size_gen - Embedding size of the generator
@@ -88,7 +88,7 @@ class GAN_Model(nn.Module):
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, L_gen, T_disc, B_disc, O_disc, hiddenSize, useNorm, costSlope, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, L_gen, T_disc, B_disc, O_disc, hiddenSize, noiseDist, costSlope, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, gen_outEnc_mode, embed_mode_gen, embed_mode_disc, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -137,10 +137,10 @@ class GAN_Model(nn.Module):
         
         # The generator, discriminator, and teacher models
         if self.dev != "cpu":
-            self.generator = Generator(vocab, M_gen, B_gen, O_gen, L_gen, useNorm, hiddenSize, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, L_gen, noiseDist, hiddenSize, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, gpu)
             self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", hiddenSize, batchSize, len(vocab), embedding_size_disc, sequence_length, num_heads, pooling, embed_mode_disc, gpu)
         else:
-            self.generator = Generator(vocab, M_gen, B_gen, O_gen, L_gen, useNorm, hiddenSize, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
+            self.generator = Generator(vocab, M_gen, B_gen, O_gen, L_gen, noiseDist, hiddenSize, batchSize, embedding_size_gen, sequence_length, num_heads, embed_mode_gen, gen_outEnc_mode, device)
             self.discriminator = Discriminator(T_disc, B_disc, O_disc, "none", hiddenSize, batchSize, len(vocab), embedding_size_disc, sequence_length, num_heads, pooling, embed_mode_disc, device)
         
         # The optimizer for the models
@@ -191,16 +191,28 @@ class GAN_Model(nn.Module):
         
         # Send the transformed and combined data through the
         # discriminator
-        disc_hat = self.discriminator(x_hat, lens_hat, masks_hat)
+        disc_hat, disc_lens_hat = self.discriminator(x_hat, lens_hat, masks_hat)
         
-        # Get the gradients of the discriminator output
-        gradients = torch.autograd.grad(outputs=(disc_hat), inputs=(x_hat, lens_hat),
+        # Get the gradients of the discriminator output on the sentences
+        gradients = torch.autograd.grad(outputs=(disc_hat), inputs=(x_hat),
                               grad_outputs=(torch.ones(disc_hat.size(), device=device)),
                               create_graph=True, retain_graph=True, only_inputs=True)[0]
         gradients = gradients.view(gradients.size(0), -1)
+
+        # Gradient penalty of the sentences
+        GP_sent = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.Lambda
+
+        # Get the gradients of the discriminator output on the sentences
+        gradients = torch.autograd.grad(outputs=(disc_lens_hat), inputs=(lens_hat),
+                              grad_outputs=(torch.ones(disc_lens_hat.size(), device=device)),
+                              create_graph=True, retain_graph=True, only_inputs=True)[0]
+        gradients = gradients.view(gradients.size(0), -1)
+
+        # Gradient penalty of the sentences
+        GP_lens = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.Lambda
         
         # Get the final penalty and return it
-        return ((gradients.norm(2, dim=1) - 1) ** 2).mean() * self.Lambda
+        return GP_sent, GP_lens
     
     
     
@@ -315,7 +327,11 @@ class GAN_Model(nn.Module):
         self.discLoss = []
         self.discLoss_real = []
         self.discLoss_fake = []
-        self.MREs = []
+        self.MDs = []
+        self.genLoss_lens = []
+        self.discLoss_lens = []
+        self.discLoss_real_lens = []
+        self.discLoss_fake_lens = []
         
         # Initial variable states
         masks = None
@@ -337,9 +353,12 @@ class GAN_Model(nn.Module):
             # Train the discriminator first or if dynamic_n is used and
             # r_d > r_g
             self.optim_disc.zero_grad()
-            disc_loss_cum = 0
-            disc_fake_cum = 0
-            disc_real_cum = 0
+            disc_loss_avg = 0
+            disc_fake_avg = 0
+            disc_real_avg = 0
+            disc_loss_lens_avg = 0
+            disc_fake_lens_avg = 0
+            disc_real_lens_avg = 0
             for i in range(0, max(self.n_D, 1) if self.dynamic_n == False else 1):
                 # Sample data for the discriminator
                 disc_sub = disc_nums[:self.batchSize]
@@ -348,53 +367,22 @@ class GAN_Model(nn.Module):
                 # Put the data on the correct device
                 if self.dev == "partgpu":
                     disc_sub = disc_sub.to(gpu)
-                    disc_nums = disc_nums.to(gpu)
                 else:
                     disc_sub = disc_sub.to(self.device)
-                    disc_nums = disc_nums.to(self.device)
                 
                 # Generate some data from the generator
                 with torch.no_grad():
-                    fake_X, lens_fake = self.generator.forward_(training=False)
-
-                # Get the masks for the generator
-                masks_fake = self.getMask(lens_fake)
+                    fake_X = self.generator.forward(training=False)
                 
-                # Send the generated output through the discriminator
-                # to get a batch of predictions on the fake sentences
-                disc_fake = self.discriminator(fake_X, lens_fake, masks_fake)
+                # Get the real sentences as one-hot sequences
+                real_X = [torch.nn.functional.one_hot(X_orig[i], len(self.vocab)) for i in disc_sub.cpu().numpy()]
                 
-                # Get a real data subset using one_hot encoding
-                if self.loadInEpoch == True:
-                    # Load in more data until no more data is availble
-                    # or the requested batch size is obtained
-                    real_X = np.array([])
-                    while real_X.shape[0] < self.batchSize or disc_nums.shape[0] == 0:
-                        # Get more data if needed
-                        disc_sub = disc_nums[:self.batchSize]
-                        disc_nums = disc_nums[self.batchSize:]
-                        
-                        # Save the data
-                        if len(real_X) == 0:
-                            real_X = np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)
-                        else:
-                            real_X = np.concatenate((real_X, np.array(encode_sentences_one_hot(X[disc_sub.cpu().numpy()].tolist(), self.vocab_inv, self.sequence_length, False, cpu), dtype=object)[:self.batchSize-real_X.shape[0]]))
-                    
-                    # If disc_nums is empty, a problem occured
-                    assert disc_nums.shape[0] > 0, "Not enough data under requested sequence length"
-                else:
-                    # Get the real sentences as one-hot sequences
-                    real_X = [torch.nn.functional.one_hot(X_orig[i], len(self.vocab)) for i in disc_sub.cpu().numpy()]
-                
-                # Add padding to the subset
+                # Add padding to the real data
                 real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
                 if self.dev == "partgpu":
                     real_X = real_X.to(gpu)
                 else:
                     real_X = real_X.to(self.device)
-
-                # Get the real data lengths
-                lens_real = self.getLens(real_X)
                 
                 # Get the variance
                 # sampleSize = 100000
@@ -432,9 +420,37 @@ class GAN_Model(nn.Module):
                 #         # replace the one-hot vector
                 #         real_X[i, j] = N_disc.to(self.device)
 
+
+
+
+                # Sample half a batch from the real and fake generated data
+                # to generate a batch of half real and half fake sentences
+                fake_X_samp = fake_X[np.random.permutation(np.arange(self.batchSize))[:self.batchSize//2]]
+                real_X_samp = real_X[np.random.permutation(np.arange(self.batchSize))[:self.batchSize//2]]
+
+                # Create the batch of data to generate lengths for
+                X_samp = torch.cat((fake_X_samp, real_X_samp), dim=0)
+
+                # Get the fake lengths from the generator
+                with torch.no_grad():
+                    lens_fake = self.generator.forward_lens(X_samp)
+
+
+
+
+                # Get the real data lengths
+                lens_real = self.getLens(real_X)
+
                 # One hot encode the lengths and masks
                 lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length).float()
                 masks_real = self.getMask(lens_real)
+
+                # Get the masks for the generator
+                masks_fake = self.getMask(lens_fake)
+                
+                # Send the generated output through the discriminator
+                # to get a batch of predictions on the fake sentences
+                disc_fake, disc_lens_fake = self.discriminator(fake_X, lens_fake, masks_fake)
 
                 # Make the inputs into the discriminator loss variables
                 # for differentiation
@@ -444,62 +460,68 @@ class GAN_Model(nn.Module):
                 lens_fake = torch.autograd.Variable(lens_fake, requires_grad=True)
 
                 # Get the gradient penalty
-                gradient_penalty = self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake, \
+                gradient_penalty, gradient_penalty_lens = \
+                    self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake, \
                     masks_real, masks_fake)
 
-                # Calculate the mean reconstruction error for debugging
-                MRE = torch.abs(real_X-fake_X).sum(-1).sum(-1).mean()
+                # Calculate mean difference for debugging
+                MD = torch.abs(real_X-fake_X).sum(-1).sum(-1).mean().detach().cpu()
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences
-                disc_real = self.discriminator(real_X, lens_real, masks_real)
+                disc_real, disc_lens_real = self.discriminator(real_X, lens_real, masks_real)
                 
                 # Get the discriminator loss
-                #discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                # discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
                 discLoss = wasserstein_disc(disc_real, disc_fake)
+                discLoss_lens = wasserstein_disc(disc_lens_real, disc_lens_fake)
                 
-                #discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
-                discLoss_fake, discLoss_real, dist = (*wasserstein_disc_split(disc_real, disc_fake), torch.tensor(0))
+                # discLoss_real, discLoss_fake, dist = GLS_disc_split(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")
+                discLoss_fake, discLoss_real = wasserstein_disc_split(disc_real, disc_fake)
+                discLoss_lens_fake, discLoss_lens_real = wasserstein_disc_split(disc_lens_real, disc_lens_fake)
 
                 # The cost of the discriminator is the loss + the penalty
                 discCost = discLoss + gradient_penalty
+                discCost_lens = discLoss_lens + gradient_penalty_lens
                 
                 if self.dynamic_n == False or (self.dynamic_n == True and r_d > self.Lambda_n*r_g):
                     # Backpropogate the cost
-                    discCost.backward()
+                    (discCost + discCost_lens).backward()
                     
                     # Step the optimizer
                     self.optim_disc.step()
                 self.optim_disc.zero_grad()
 
                 # Loss cumulation
-                disc_loss_cum += discLoss.cpu().detach().item()
-                disc_fake_cum += discLoss_fake.cpu().detach().item()
-                disc_real_cum += discLoss_real.cpu().detach().item()
+                disc_loss_avg += discLoss.cpu().detach().item()
+                disc_fake_avg += discLoss_fake.cpu().detach().item()
+                disc_real_avg += discLoss_real.cpu().detach().item()
+                disc_loss_lens_avg += discLoss_lens.cpu().detach().item()
+                disc_fake_lens_avg += discLoss_lens_fake.cpu().detach().item()
+                disc_real_lens_avg += discLoss_lens_real.cpu().detach().item()
 
                 # Delete all discriminator stuff as its no longer needed
-                discCost = discCost.detach()
+                discCost = discCost.detach().cpu()
+                discCost_lens = discCost_lens.detach().cpu()
+                discLoss = discLoss.detach().cpu()
+                discLoss_lens = discLoss_lens.detach().cpu()
+                discLoss_fake = discLoss_fake.detach().cpu()
+                discLoss_lens_fake = discLoss_lens_fake.detach().cpu()
+                discLoss_real = discLoss_real.detach().cpu()
+                discLoss_lens_real = discLoss_lens_real.detach().cpu()
                 gradient_penalty = gradient_penalty.cpu().detach().item()
-                del disc_sub, real_X, lens_real, lens_fake
-            
-
-            # Dynamic Generator N Estimation
-            i = 10
-            if len(self.MREs) > i-1 and epoch%i == 0:
-                d_MRE = (MRE.cpu().item() - self.MREs[-(i-1)])/i
-                d_MRE += 0.5
-                self.ROC = max(1, self.ROC + d_MRE)
-                import math
-                self.G_n = math.ceil(self.ROC)
-                print(self.ROC)
+                gradient_penalty_lens = gradient_penalty_lens.cpu().detach().item()
+                del disc_sub, real_X, X_samp, real_X_samp, fake_X, masks_fake, masks_real,\
+                    disc_real, disc_lens_real, disc_fake, disc_lens_fake, fake_X_samp, \
+                    lens_fake, lens_real
 
 
             # Train the generator next
             self.optim_gen.zero_grad()
             for i in range(0, 1 if self.dynamic_n == False else 1):
                 # Sample real data for the second loss function
-                disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
+                disc_sub = disc_nums[:self.batchSize//2]
+                disc_nums = disc_nums[self.batchSize//2:]
 
                 # Put the data on the correct device
                 if self.dev == "partgpu":
@@ -508,33 +530,61 @@ class GAN_Model(nn.Module):
                 else:
                     disc_sub = disc_sub.to(self.device)
                     disc_nums = disc_nums.to(self.device)
-                    
-                
+
+
+
                 # Generate some data from the generator
-                fake_X, lens_fake = self.generator.forward_(training=True)
+                fake_X = self.generator.forward(training=True)
+                
+                # Get the real sentences as one-hot sequences
+                real_X = [torch.nn.functional.one_hot(X_orig[i], len(self.vocab)) for i in disc_sub.cpu().numpy()]
+                
+                # Add padding to the real data
+                real_X = addPadding_one_hot(real_X, self.vocab_inv, self.sequence_length)
+                if self.dev == "partgpu":
+                    real_X = real_X.to(gpu)
+                else:
+                    real_X = real_X.to(self.device)
+
+
+                # Sample half a batch from the real and fake generated data
+                # to generate a batch of half real and half fake sentences
+                fake_X_samp = fake_X[np.random.permutation(np.arange(self.batchSize))[:self.batchSize//2]]
+
+                # Create the batch of data to generate lengths for
+                X_samp = torch.cat((fake_X_samp, real_X), dim=0)
+
+                # Get the fake lengths from the generator
+                lens_fake = self.generator.forward_lens(X_samp)
 
                 # Get the masks for the generator
                 masks_fake = self.getMask(lens_fake)
+                    
+
+                    
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the fake sentences
-                disc_fake = self.discriminator(fake_X, lens_fake, masks_fake)
+                disc_fake, disc_fake_lens = self.discriminator(fake_X, lens_fake, masks_fake)
                 
                 # Get the generator loss
                 #genLoss = GLS_gen(disc_fake)
                 genLoss = wasserstein_gen(disc_fake)
+                genLoss_lens = wasserstein_gen(disc_fake_lens)
 
                 if self.dynamic_n == False or (self.dynamic_n == True and r_d <= self.Lambda_n*r_g):
                     # Backpropogate the loss
-                    genLoss.backward()
+                    (genLoss + genLoss_lens).backward()
                     
                     # Step the optimizer
                     self.optim_gen.step()
                 self.optim_gen.zero_grad()
                 genLoss = genLoss.detach()
+                genLoss_lens = genLoss_lens.detach()
             
                 # Delete all generator stuff as its no longer needed
-                del disc_sub, fake_X, lens_fake
+                del fake_X, real_X, fake_X_samp, X_samp, lens_fake, masks_fake, \
+                    disc_fake, disc_fake_lens
 
             
             # Dynamic n updates:
@@ -548,23 +598,34 @@ class GAN_Model(nn.Module):
             
             
             # Flip the maximizing values to represent the actual value
-            disc_real_cum *= -1
+            disc_real_avg *= -1
             genLoss *= -1
+            disc_real_lens_avg *= -1
+            genLoss_lens *= -1
 
             # Average the losses
-            disc_loss_cum /= self.n_D
-            disc_real_cum /= self.n_D
-            disc_fake_cum /= self.n_D
+            disc_loss_avg /= self.n_D
+            disc_real_avg /= self.n_D
+            disc_fake_avg /= self.n_D
+            disc_loss_lens_avg /= self.n_D
+            disc_real_lens_avg /= self.n_D
+            disc_fake_lens_avg /= self.n_D
             
             
             # Save the loss values
             self.genLoss.append(genLoss.item())
-            self.discLoss.append(disc_loss_cum)
-            self.discLoss_real.append(disc_real_cum)
-            self.discLoss_fake.append(disc_fake_cum)
-            self.MREs.append(MRE.item())
+            self.genLoss_lens.append(genLoss_lens.item())
+            self.discLoss.append(disc_loss_avg)
+            self.discLoss_real.append(disc_real_avg)
+            self.discLoss_fake.append(disc_fake_avg)
+            self.discLoss_lens.append(disc_loss_lens_avg)
+            self.discLoss_real_lens.append(disc_real_lens_avg)
+            self.discLoss_fake_lens.append(disc_fake_lens_avg)
+            self.MDs.append(MD.item())
             
-            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}     Discriminator Real: {round(disc_real_cum, 4)}     Discriminator Fake: {round(disc_fake_cum, 4)}    Discriminator Loss: {round(disc_loss_cum, 4)}    GP: {round(gradient_penalty, 4)}    Dist: {round(dist.item(), 4)}    MRE: {round(MRE.item(), 4)}", end="")
+            print(f"Epoch: {epoch}   Generator Loss: {round(genLoss.item(), 4)}    Generator Loss L: {round(genLoss_lens.item(), 4)}\n"+\
+                f"Discriminator Real: {round(disc_real_avg, 4)}     Discriminator Fake: {round(disc_fake_avg, 4)}    Discriminator Loss: {round(disc_loss_avg, 4)}    GP: {round(gradient_penalty, 4)}    MD: {round(MD.item(), 4)}\n"+\
+                f"Discriminator Real L: {round(disc_real_lens_avg, 4)}     Discriminator Fake L: {round(disc_fake_lens_avg, 4)}    Discriminator Loss L: {round(disc_loss_lens_avg, 4)}    GP L: {round(gradient_penalty_lens, 4)}\n", end="")
             if self.dynamic_n:
                 print(f"    r_g: {round(r_g, 4)}    r_d: {round(r_d, 4)}", end="")
             print()
@@ -587,7 +648,7 @@ class GAN_Model(nn.Module):
             self.discriminator.saveModel(saveDir, discFile)
             
             if self.trainGraphFile:
-                fix, ax = plt.subplots()
+                fig, ax = plt.subplots()
                 y = [i for i in range(1, len(self.genLoss)+1)]
                 ax.plot(y, self.genLoss, label="Gen loss")
                 ax.plot(y, self.discLoss_real, label="Disc loss real")
@@ -600,13 +661,27 @@ class GAN_Model(nn.Module):
                 plt.savefig(self.saveDir + os.sep + self.trainGraphFile)
                 plt.close()
 
-                fix, ax = plt.subplots()
-                ax.plot(y, self.MREs, label="MRE")
-                ax.set_title("MRE over epochs")
+                fig, ax = plt.subplots()
+                ax.plot(y, self.MDs, label="MD")
+                ax.set_title("MD over epochs")
                 ax.set_xlabel("Epochs")
-                ax.set_ylabel("MRE")
+                ax.set_ylabel("MD")
                 ax.legend()
-                plt.savefig(self.saveDir + os.sep + "MREGraph.png")
+                plt.savefig(self.saveDir + os.sep + "MDGraph.png")
+                plt.close()
+
+                
+                fig, ax = plt.subplots()
+                y = [i for i in range(1, len(self.genLoss)+1)]
+                ax.plot(y, self.genLoss_lens, label="Gen loss")
+                ax.plot(y, self.discLoss_real_lens, label="Disc loss real")
+                ax.plot(y, self.discLoss_fake_lens, label="Disc loss fake")
+                ax.plot(y, self.discLoss_lens, label="Disc loss combined")
+                ax.set_title("Gen and disc loss on lengths over epochs")
+                ax.set_xlabel("Epochs")
+                ax.set_ylabel("Loss")
+                ax.legend()
+                plt.savefig(self.saveDir + os.sep + "L_" + self.trainGraphFile)
                 plt.close()
     
     # Load the models

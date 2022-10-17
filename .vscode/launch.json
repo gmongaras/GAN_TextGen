@@ -12,7 +12,7 @@
 		    //"module": "src.nonGANs.main",
 		    //"module": "src.helpers.generate_chars",
 		    //"module": "src.helpers.generate_words",
-            //"module": "data.Text2.script.py",
+            //"module": "data.Text2.script",
             "console": "integratedTerminal",
             "justMyCode": false
         }

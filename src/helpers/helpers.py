@@ -34,18 +34,25 @@ def loadVocab(vocab_file):
 #   Sentence - A sentence to clean
 # Output:
 #   A list of cleaned words
+#   proportion of removed words in the sentence
 def get_clean_words(Sentence):
-    # Make the sentence lowercase
+    # Make the sentence lowercase and without redundant spacng
     Sentence = Sentence.lower()
     
     # Split the sentence up into words
     words = word_tokenize(Sentence)
+
+    # Number of words before cleaning
+    num_bef = len(words)
     
     # Remove all punctuation
-    words = [word.lower() for word in words if word.isalpha()]
+    words = [word.lower() for word in words if word.isalnum()]
+
+    # Number of words after cleaning
+    num_af = len(words)
     
-    # Return the words
-    return words
+    # Return the words and proportion
+    return words, num_af/num_bef
 
 
 
@@ -90,7 +97,7 @@ def encode_sentences(X, vocab_inv, sequence_length, encoder, deleteOrig, device)
         enc_words = []
         
         # Get the words from the sentence
-        words = get_clean_words(sentence)
+        words, prop = get_clean_words(sentence)
         
         # Iterate over each word
         for word in words:
@@ -171,7 +178,7 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
         enc_words = []
         
         # Get the words from the sentence
-        words = get_clean_words(sentence)
+        words, prop = get_clean_words(sentence)
         
         # Iterate over each word
         for word in words:
@@ -228,8 +235,12 @@ def encode_sentences_one_hot(X, vocab_inv, sequence_length, deleteOrig, device):
 #   encoder - Encoder object that excepts a word as
 #             input and returns a vector form of that word
 def addPadding(X, vocab_inv, sequence_length, encoder):
-    # The padding tensor
+    # The padding tensor. Note <END> is used as a temp variable
+    # since <PAD> is not in the vocab anymore
     pad_enc = encoder(torch.tensor(vocab_inv["<PAD>"]))
+
+    # Instead of padding, use 0s
+    pad_enc = pad_enc*0
     
     # The new padded tensor
     X_padded = torch.zeros(X.shape[0], sequence_length, pad_enc.shape[-1])

@@ -49,7 +49,7 @@ def load_words(filename, maxLen, vocab, input_size, lower, limit):
             sentence = sentence.strip()
             if lower:
                 sentence = sentence.lower()
-            sentence = get_clean_words(sentence)
+            sentence, prop = get_clean_words(sentence)
 
             # Get the line as a list of encoded characters
             try:

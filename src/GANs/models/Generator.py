@@ -18,8 +18,8 @@ class Generator(nn.Module):
     #   B - Number of transformer blocks to encode the input sequence
     #   O - Number of transformer blocks to get the output sequence
     #   L - Number of transformer blocks to encode the lengths
-    #   useNorm - True to use a normal distribution for noise, False
-    #             to use a uniform distribution
+    #   noiseDist - Distribution to sample noise from. Can be one of 
+    #               (\"norm\", \"unif\", \"trunc\" (for truncated normal))
     #   hiddenSize - Hidden linear size in the transformer blocks
     #   batchSize - Size of the batch of sentences to generate
     #   embedding_size - Size of each word embedding
@@ -31,7 +31,7 @@ class Generator(nn.Module):
     #            output sequences which will be fed into the
     #            discriminator? ("norm", "gumb")
     #   device - The device to put the model on
-    def __init__(self, vocab, M, B, O, L, useNorm, hiddenSize, batchSize, embedding_size, sequence_length, num_heads, embed_mode, outEnc, device):
+    def __init__(self, vocab, M, B, O, L, noiseDist, hiddenSize, batchSize, embedding_size, sequence_length, num_heads, embed_mode, outEnc, device):
         super(Generator, self).__init__()
         
         # Saved states
@@ -46,11 +46,11 @@ class Generator(nn.Module):
         self.device = device
         
         # Input embedding (noise to some sort of embedding)
-        modules = [nn.Linear(self.sequence_length, self.sequence_length) for i in range(M)]
+        modules = [nn.Linear(self.embedding_size, self.embedding_size) for i in range(M)]
         self.inEmb = nn.Sequential(*modules).to(device)
         
         # Transformer blocks
-        self.generator = nn.ModuleList([outTrans(embedding_size, embedding_size, useNorm, num_heads, device, hiddenSize) for i in range(B)]).to(device)
+        self.generator = nn.ModuleList([outTrans(embedding_size, embedding_size, noiseDist, num_heads, device, hiddenSize) for i in range(B)]).to(device)
         
         # Output embedding transformer blocks
         self.outEmb = nn.ModuleList([inTrans(embedding_size, embedding_size, num_heads, hiddenSize) for i in range(O)]).to(device)
@@ -60,7 +60,8 @@ class Generator(nn.Module):
             self.CustomEmb = CustomEmb(len(vocab.keys()), embedding_size, [len(vocab.keys())//2, len(vocab.keys())//4, 1000, 100], True, self.device)
         # If the embed_mode is "norm", use Word2Vec embeddings
         else:
-            self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
+            # self.Word2Vec = nn.Embedding(len(vocab.keys()), embedding_size).to(device)
+            self.Word2Vec = nn.Linear(len(vocab.keys()), embedding_size, bias=False, device=device)
         
         # Positional encoding block
         self.PositionalEncoding = PositionalEncoding(embedding_size, 0.0, len(self.vocab)).to(device)
@@ -75,17 +76,18 @@ class Generator(nn.Module):
         if outEnc == "gumb":
             self.gumb_linear = nn.Linear(embedding_size, len(self.vocab.keys())).to(device)
 
-        # Normal or uniform distribution for the model
-        if useNorm == True:
-            self.dist = torch.distributions.normal.Normal(0, 1)
-        else:
+        # Noise distribution for the model
+        self.noiseDist = noiseDist
+        if noiseDist == "unif":
             self.dist = torch.distributions.uniform.Uniform(-1, 1)
+        else:
+            self.dist = torch.distributions.normal.Normal(0, 1)
 
         # Used to embed the sentecen from V -> E for the lengths
         self.lensEmbedding = nn.Linear(len(vocab), embedding_size, device=device, bias=False)
 
         # Token used to predict the lengths
-        self.lensTok = nn.Parameter(torch.rand(batchSize, 1, embedding_size, device=device, requires_grad=True))
+        self.lensTok = nn.Parameter(torch.rand(1, 1, embedding_size, device=device, requires_grad=True))
 
         # Model used to predict the legths of the model
         self.lenGen = nn.Sequential(*[inTrans(embedding_size, embedding_size, num_heads, hiddenSize) for i in range(L)]).to(device)
@@ -93,6 +95,10 @@ class Generator(nn.Module):
         # Linear layer used to decode the lengths
         self.lensDec_E = nn.Linear(embedding_size, 1, device=device)
         self.lensDec_S = nn.Sequential(
+            #nn.Linear(sequence_length, sequence_length, device=device),
+            nn.Softmax(dim=-1),
+        ).to(device)
+        self.lensDec_S_2 = nn.Sequential(
             nn.Linear(embedding_size, sequence_length, device=device),
             nn.Softmax(dim=-1),
         ).to(device)
@@ -109,7 +115,7 @@ class Generator(nn.Module):
     #   A 3-D tensor of shape (N, sequence_length)
     #      where each batch element is the softmax output representing
     #      the probability of the length of the Nth sentence
-    def forward_(self, training=False):
+    def forward(self, training=False):
         # Put the model in test/eval mode
         if training:
             self.train()
@@ -117,7 +123,12 @@ class Generator(nn.Module):
             self.eval()
         
         # Generate some noise
-        noise = self.dist.sample((self.batchSize, self.sequence_length, self.embedding_size)).float().to(self.device)
+        if self.noiseDist == "trunc":
+            a = -1.5
+            b = 1.5
+            noise = torch.nn.init.trunc_normal_(torch.empty((self.batchSize, self.sequence_length, self.embedding_size)), a=a, b=b).to(self.device)
+        else:
+            noise = self.dist.sample((self.batchSize, self.sequence_length, self.embedding_size)).float().to(self.device)
         noise.requires_grad = True
         
         # Send the noise through the input blocks
@@ -128,17 +139,22 @@ class Generator(nn.Module):
         # Get a forward pass from the network
         if self.embed_mode == "custom":
             print("Custom is no longer supported. Defaulting to norm")
-        return self.forward(w)
+        return self.forward_(w)
         
         
     # Forward using normal Word2Vec embeddings
-    def forward(self, w):
+    def forward_(self, w):
         # Get positional encodings for all tokens including future
         # tokens that will be generated
         posEnc = self.PositionalEncoding(torch.zeros(w.shape, requires_grad=True, device=self.device))
 
-        # Seed the next word prediction from the model
-        seeds = self.dist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
+        # Seed the next word using noise from a distribution
+        if self.noiseDist == "trunc":
+            a = -1.5
+            b = 1.5
+            seeds = torch.nn.init.trunc_normal_(torch.empty((self.batchSize, 1, self.embedding_size)), a=a, b=b).to(self.device)
+        else:
+            seeds = self.dist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
         if seeds.requires_grad == False:
             seeds.requires_grad = True
         
@@ -187,21 +203,29 @@ class Generator(nn.Module):
             for i in range(self.batchSize):
                 out_sent[i].append(out_tok_soft[i])
 
-             # Get the argmax of the output tokens
-            out_tok = torch.argmax(out_tok_soft, dim=-1)
+            # Get the argmax of the output tokens
+            # out_tok = torch.argmax(out_tok_soft, dim=-1)
             
             # Encode the output token
-            out_tok = self.Word2Vec(out_tok)
-            
-            # Add the new token to the output and add a new
-            # seed to the sequence
-            if tok+1 < self.sequence_length:
-                # Add the new token to the output
-                Y = torch.cat((Y.clone()[:, :tok], (out_tok).unsqueeze(1)), dim=1)
+            # out_tok = self.Word2Vec(out_tok)
+            out_tok = self.Word2Vec(out_tok_soft)
 
+            # Add the new token to the output
+            Y = torch.cat((Y.clone()[:, :tok], (out_tok).unsqueeze(1)), dim=1)
+            
+            # If the sequence has not ended, add
+            # a new random token to the end of the sentence
+            if tok+1 < self.sequence_length:
                 # Seed the next word using noise from a distribution
-                seeds = self.dist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
-                Y = torch.cat((Y, seeds), dim=1) # Add the seeds
+                if self.noiseDist == "trunc":
+                    a = -1.5
+                    b = 1.5
+                    seeds = torch.nn.init.trunc_normal_(torch.empty((self.batchSize, 1, self.embedding_size)), a=a, b=b).to(self.device)
+                else:
+                    seeds = self.dist.sample((self.batchSize, 1, self.embedding_size)).float().to(self.device)
+                seeds.requires_grad = True
+
+                Y = torch.cat((Y, seeds), dim=1) # Add the seeds to the sequence
                 
         
         # Turn the output into a tensor
@@ -286,51 +310,48 @@ class Generator(nn.Module):
 
 
 
-
-        # Feed the whole output into the generator.
-        # Note: We are using the output with an attached graph
-        # so that each outputted word is effected by the
-        # gradient of the length token.
-
-        # Get the length estimation from the second model
-        # (N, S, E) -> (N, S, E)
-        # lens = lens_sent.clone().detach()
-        # for block in self.lenGen:
-        #     lens = block(lens)
-
-        # # Decode the lengths
-        # # (N, S, E) -> (N, S, 1)
-        # lens = self.lensDec_E(lens).squeeze()
-        # # (N, S) -> (N, S)
-        # lens = self.lensDec_S(lens)
-
-
-        # Embed the sentence for the lengths
-        # (N, S, V) -> (N, S, E)
-        lens = self.lensEmbedding(out_sent.clone().detach())
-
-        # Get the length estimation from the second model
-        # (N, S+1, E) -> (N, S+1, E)
-        #lens = lens_sent.clone().detach()
-        lens = torch.cat((self.lensTok, lens), dim=1)
-        lens = self.lenGen(lens)
-
-        # Decode the lengths
-        # (N, S, E) -> (N, E)
-        lens = lens[:, 0].squeeze()
-        # (N, E) -> (N, S)
-        lens = self.lensDec_S(lens)
-
-        # For each length, replace the value after the estimated
-        # length with 0s. So no gradient and the value will not contribute to
-        # the linear layer in the discriminator
-        # for i in range(0, lens.shape[0]):
-        #     out_sent[i, torch.argmax(lens, dim=-1)[i].item()+1:] *= 0
-
         
         # Return the output:
         # (N, S, V) and (N, S)
-        return out_sent, lens
+        return out_sent
+
+    
+
+
+    def forward_lens(self, out_sent):
+        # Get the length estimation from the second model
+        # (N, S, V) -> (N, S, E)
+        out_sent = self.lensEmbedding(out_sent.clone().detach())
+        lens = self.PositionalEncoding(out_sent)
+        for block in self.lenGen:
+            lens = block(lens)
+
+        # Decode the lengths
+        # (N, S, E) -> (N, S, 1)
+        lens = self.lensDec_E(lens).squeeze()
+        # (N, S) -> (N, S)
+        lens = self.lensDec_S(lens)
+
+
+
+        # # Get the length estimation from the second model
+        # # (N, S, E) -> (N, S, E)
+        # out_sent = self.Word2Vec(out_sent.clone().detach())
+        # lens = self.PositionalEncoding(out_sent)
+        # lens = torch.cat((self.lensTok.repeat(lens.shape[0], 1, 1), lens), dim=1)
+        # for block in self.lenGen:
+        #     lens = block(lens)
+
+        # # Get the token from the model
+        # lens = lens[:, 0]
+
+        # # Decode the token
+        # # (N, E) -> (N, S)
+        # lens = self.lensDec_S_2(lens)
+
+
+
+        return lens
     
     
     # Save the model
