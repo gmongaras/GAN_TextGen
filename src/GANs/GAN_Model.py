@@ -361,8 +361,8 @@ class GAN_Model(nn.Module):
             disc_real_lens_avg = 0
             for i in range(0, max(self.n_D, 1) if self.dynamic_n == False else 1):
                 # Sample data for the discriminator
-                disc_sub = disc_nums[:self.batchSize]
-                disc_nums = disc_nums[self.batchSize:]
+                disc_sub = disc_nums[:self.batchSize+self.batchSize//2]
+                disc_nums = disc_nums[self.batchSize+self.batchSize//2:]
 
                 # Put the data on the correct device
                 if self.dev == "partgpu":
@@ -425,8 +425,8 @@ class GAN_Model(nn.Module):
 
                 # Sample half a batch from the real and fake generated data
                 # to generate a batch of half real and half fake sentences
-                fake_X_samp = fake_X[np.random.permutation(np.arange(self.batchSize))[:self.batchSize//2]]
-                real_X_samp = real_X[np.random.permutation(np.arange(self.batchSize))[:self.batchSize//2]]
+                fake_X_samp = fake_X[:self.batchSize//2]
+                real_X_samp = real_X[:self.batchSize//2]
 
                 # Create the batch of data to generate lengths for
                 X_samp = torch.cat((fake_X_samp, real_X_samp), dim=0)
@@ -439,7 +439,7 @@ class GAN_Model(nn.Module):
 
 
                 # Get the real data lengths
-                lens_real = self.getLens(real_X)
+                lens_real = self.getLens(real_X[self.batchSize//2:])
 
                 # One hot encode the lengths and masks
                 lens_real = torch.nn.functional.one_hot(lens_real, self.sequence_length).float()
@@ -461,15 +461,15 @@ class GAN_Model(nn.Module):
 
                 # Get the gradient penalty
                 gradient_penalty, gradient_penalty_lens = \
-                    self.get_gradient_penalty(real_X, lens_real, fake_X, lens_fake, \
+                    self.get_gradient_penalty(real_X[self.batchSize//2:], lens_real, fake_X, lens_fake, \
                     masks_real, masks_fake)
 
                 # Calculate mean difference for debugging
-                MD = torch.abs(real_X-fake_X).sum(-1).sum(-1).mean().detach().cpu()
+                MD = torch.abs(real_X[self.batchSize//2:]-fake_X).sum(-1).sum(-1).mean().detach().cpu()
                 
                 # Send the generated output through the discriminator
                 # to get a batch of predictions on the real sentences
-                disc_real, disc_lens_real = self.discriminator(real_X, lens_real, masks_real)
+                disc_real, disc_lens_real = self.discriminator(real_X[self.batchSize//2:], lens_real, masks_real)
                 
                 # Get the discriminator loss
                 # discLoss = GLS_disc(disc_real, disc_fake, real_X, fake_X, self.costSlope, "l1")

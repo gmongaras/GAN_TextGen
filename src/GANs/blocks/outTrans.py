@@ -57,13 +57,15 @@ class outTrans(nn.Module):
         X += X_2
         
         # Add noise using the given noise distribution
-        if self.noiseDist == "trunc":
-            a = -1.5
-            b = 1.5
-            noise = torch.nn.init.trunc_normal_(torch.empty(X.shape), a=a, b=b).to(self.device)
-        else:
-            noise = self.dist.sample(X.shape).float().to(self.device)
-        X += noise
+        # if the noise distribution is not None
+        if self.noiseDist != None:
+            if self.noiseDist == "trunc":
+                a = -1.5
+                b = 1.5
+                noise = torch.nn.init.trunc_normal_(torch.empty(X.shape), a=a, b=b).to(self.device)
+            else:
+                noise = self.dist.sample(X.shape).float().to(self.device)
+            X += noise
         
         X_saved = X.clone()
         X = self.MHA2(X_1, X)

@@ -1,9 +1,8 @@
 from ..blocks.discBlock import discBlock
-from torch import batch_norm, nn
+from torch import nn
 import torch
 import os
-from ..blocks.MHAwithNorm import MHAwithNorm
-import math
+from ..blocks.outTrans import outTrans
 
 
 
@@ -60,18 +59,20 @@ class Discriminator(nn.Module):
         Es = torch.linspace(1, embedding_size, B+1).int().numpy()
         blocks = [discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, pooling) for i in range(B)]
         self.disc_backbone_L = nn.Sequential(*blocks).to(device)
+        # blocks = [discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, pooling) for i in range(max(B//2, 1))]
+        # self.disc_backbone_L_S = nn.Sequential(*blocks).to(device)
         
-        # The discriminator classifier head
+        # The discriminator classifier head for sentences
         # (NxL+1xE) -> (N)
         self.disc_head_B_S = nn.Sequential(*[
             discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, "none") for i in range(0, O)
         ]).to(device)
         self.disc_head_L_S = nn.Linear(embedding_size, 1, device=device)
 
-        # The discriminator classifier head
+        # The discriminator classifier head for lengths
         # (NxL+1xE) -> (N)
         self.disc_head_B_L = nn.Sequential(*[
-            discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, "none") for i in range(0, O)
+            outTrans(embedding_size, embedding_size, None, num_heads, device, hiddenSize) for i in range(0, O)
         ]).to(device)
         self.disc_head_L_L = nn.Linear(embedding_size, 1, device=device)
         
@@ -85,6 +86,7 @@ class Discriminator(nn.Module):
         self.Sigmoid = nn.Sigmoid().to(device)
 
         # Lookup table for the length, just like for the vocab
+        self.sent_lookup_L = nn.Linear(vocab_size, embedding_size, bias=False, device=device)
         self.lens_lookup = nn.Linear(embedding_size, embedding_size, bias=False, device=device)
     
     
@@ -102,13 +104,17 @@ class Discriminator(nn.Module):
 
         # Convert the sentences and lengths to the proper encoding size
         # (N, S, ~) -> (N, S, E)
+        # X_len = self.sent_lookup_L(X.clone().detach())
         X = self.sent_lookup(X)
         lens = lens.unsqueeze(-1).repeat(1, 1, self.embedding_size)
         lens = self.lens_lookup(lens)
 
         # Append the sentences to the lengths so the
         # lengths have sentence context
-        lens = torch.cat((X.clone().detach(), lens), dim=1)
+        # lens = torch.cat((X_len, lens.unsqueeze(-1)), dim=-1)
+
+        # Encode the sentences for the lengths
+        # X_len = self.disc_backbone_L_S(X_len)
 
         # Send the sentences through the backbone
         if masks != None:
@@ -122,8 +128,13 @@ class Discriminator(nn.Module):
         # Shapes: (NxSx1) -> (Nx2SxE)
         lens = self.disc_backbone_L(lens)
 
+        # Add the lengths and sentence encodings together
+        intermediate_X = X.clone().detach()
+        intermediate_X = torch.cat((self.clsTok_L.repeat(intermediate_X.shape[0], 1, 1), intermediate_X), dim=1)
+        # lens = (lens / torch.norm(lens, dim=-1)) + (X_len / torch.norm(X_len, dim=-1))
+
         # Cut off the sentence part of the lengths
-        lens = lens[:, X.shape[1]:]
+        #lens = lens[:, X.shape[1]:]
 
         # Add the class token to the output of the backbone output
         X = torch.cat((self.clsTok_S.repeat(X.shape[0], 1, 1), X), dim=1)
@@ -161,7 +172,10 @@ class Discriminator(nn.Module):
                 lens = b(lens, masks)
             lens = lens[:, 0]
         else:
-            lens = self.disc_head_B_L(lens)[:, 0]
+            for b in self.disc_head_B_L:
+                lens = b(lens, intermediate_X)
+            lens = lens[:, 0]
+            # lens = self.disc_head_B_L(lens)[:, 0]
         lens = self.disc_head_L_L(lens)
 
 

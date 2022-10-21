@@ -321,8 +321,8 @@ class Generator(nn.Module):
     def forward_lens(self, out_sent):
         # Get the length estimation from the second model
         # (N, S, V) -> (N, S, E)
-        out_sent = self.lensEmbedding(out_sent.clone().detach())
-        lens = self.PositionalEncoding(out_sent)
+        lens = self.lensEmbedding(out_sent.clone().detach())
+        lens = self.PositionalEncoding(lens)
         for block in self.lenGen:
             lens = block(lens)
 
