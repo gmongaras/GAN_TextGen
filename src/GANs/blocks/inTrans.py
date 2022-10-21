@@ -19,7 +19,7 @@ class inTrans(nn.Module):
         self.E_O = E_O
         
         # The first MHA module
-        self.MHA = MHA(E_I, E_I, E_I, num_heads)
+        self.MHA = MHA(E_I, num_heads)
         
         # Feed-foward block after the MHA blocks
         self.FF1 = nn.Linear(E_I, hidden_size)
@@ -32,12 +32,12 @@ class inTrans(nn.Module):
     
     
     # Input:
-    #   A tensor of the shape (N, S, E_2) that comes from the input
+    #   X- A tensor of the shape (N, S, E_2) that comes from the input
     #     embeddings we want to encode
-    #   Optional tensor of shape (N, S)
+    #   masks - Optional tensor of shape (N, S)
     def forward(self, X, masks=None):
         X_saved = X.clone()
-        X = self.MHA(X, X, masks)
+        X = self.MHA(X, X, X, masks)
         X = self.LN1(X)
         X += X_saved
 

@@ -8,35 +8,32 @@ from ..blocks.MHA import MHA
 
 class outTrans(nn.Module):
     # Inputs:
-    #   E_1 - Input embedding size that is used for the keys and
-    #         values in the second MHA block
-    #   E_2 - Input embedding from the input into
-    #         the beginning of the transformer
+    #   E - Embedding size used in this transformer block
     #   noiseDist - Distribution to sample noise from. Can be one of 
-    #               (\"norm\", \"unif\", \"trunc\" (for truncated normal))
+    #               ("norm", "unif", "trunc" (for truncated normal))
     #   num_heads - Number of heads in each MHA block
     #   device - Device to put tensors on
     #   hidden_size - Hidden size of the linear layer
-    def __init__(self, E_1, E_2, noiseDist, num_heads, device, hidden_size=512):
+    def __init__(self, E, noiseDist, num_heads, device, hidden_size=512):
         super(outTrans, self).__init__()
         self.device = device
         
-        # The first MHA module with a mask
-        self.MHA1 = MHA(E_2, E_2, E_2, num_heads).to(device)
+        # The first self-MHA
+        self.MHA1 = MHA(E, num_heads).to(device)
         
         # Second MHA module without a mask and with an
         # input from a different source
-        self.MHA2 = MHA(E_1, E_2, E_2, num_heads).to(device)
+        self.MHA2 = MHA(E, num_heads).to(device)
         
         # Feed-foward block after the MHA blocks
-        self.FF1 = nn.Linear(E_2, hidden_size, device=device)
+        self.FF1 = nn.Linear(E, hidden_size, device=device)
         self.Act = nn.GELU()
-        self.FF2 = nn.Linear(hidden_size, E_2, device=device)
+        self.FF2 = nn.Linear(hidden_size, E, device=device)
         
         # Layer normalization blocks
-        self.LN1 = nn.LayerNorm(E_2, device=device)
-        self.LN2 = nn.LayerNorm(E_2, device=device)
-        self.LN3 = nn.LayerNorm(E_2, device=device)
+        self.LN1 = nn.LayerNorm(E, device=device)
+        self.LN2 = nn.LayerNorm(E, device=device)
+        self.LN3 = nn.LayerNorm(E, device=device)
 
         # Noise distribution for the model
         self.noiseDist = noiseDist
@@ -47,14 +44,14 @@ class outTrans(nn.Module):
     
     
     # Input:
-    #   A secondary tensor of the shape (S, E_1) that comes from
-    #     the output of the input transformer blocks
-    #   A primary tensor of the shape (N, S, E_2) that comes from
+    #   A primary tensor of the shape (N, S, E) that comes from
     #     the output sentence word embeddings
+    #   A secondary tensor of the shape (N, S, E) that comes from
+    #     the output of the input transformer blocks
     def forward(self, X_1, X_2):
-        X = self.MHA1(X_2, X_2)
+        X = self.MHA1(X_1, X_1, X_1)
         X = self.LN1(X)
-        X += X_2
+        X += X_1
         
         # Add noise using the given noise distribution
         # if the noise distribution is not None
@@ -68,7 +65,7 @@ class outTrans(nn.Module):
             X += noise
         
         X_saved = X.clone()
-        X = self.MHA2(X_1, X)
+        X = self.MHA2(X_2, X_2, X)
         X = self.LN2(X)
         X += X_saved
         

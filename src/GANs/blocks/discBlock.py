@@ -44,10 +44,11 @@ class discBlock(nn.Module):
     
     
     # Input:
-    #   3-D tensor of shape (N, S, embedding_size)
-    #   Optional 3-D tensor of shape (N, S)
+    #   X - 3-D tensor of shape (N, S, embedding_size)
+    #   masks - Optional 3-D tensor of shape (N, S)
     # Output:
-    #   3-D tensor of shape (N, S//2, 2)
+    #   3-D tensor of shape (N, S, E) without pooling,
+    #       (N, S//2, E) with pooling
     def forward(self, X, masks=None):
         if masks != None:
             # Mask all blocks
