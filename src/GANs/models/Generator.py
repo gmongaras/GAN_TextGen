@@ -4,8 +4,7 @@ import os
 from ..blocks.outTrans import outTrans
 from ..blocks.inTrans import inTrans
 from ..blocks.PositionalEncoding import PositionalEncoding
-from ..blocks.MHA import MHA
-from ..blocks.MHAwithNorm import MHAwithNorm
+import json
 
 
 
@@ -29,11 +28,23 @@ class Generator(nn.Module):
         
         # Saved parameters
         self.vocab = vocab
-        self.vocab_inv = {vocab[i]:i for i in vocab.keys()}
         self.batchSize = batchSize
         self.embedding_size = embedding_size
         self.sequence_length = sequence_length
         self.device = device
+
+        # Dictionary of important default parameters for later loading
+        self.defaults = {
+            "vocab": vocab,
+            "M": M,
+            "B": B,
+            "O": O,
+            "noiseDist": noiseDist,
+            "hiddenSize": hiddenSize,
+            "embedding_size": embedding_size,
+            "sequence_length": sequence_length,
+            "num_heads": num_heads
+        }
         
         # Input embedding (noise to some sort of embedding)
         modules = [nn.Linear(self.embedding_size, self.embedding_size) for i in range(M)]
@@ -53,11 +64,11 @@ class Generator(nn.Module):
         self.Word2Vec = nn.Linear(len(vocab.keys()), embedding_size, bias=False, device=device)
         
         # Positional encoding block
-        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.0, len(self.vocab)).to(device)
+        self.PositionalEncoding = PositionalEncoding(embedding_size, 0.0, len(vocab)).to(device)
         
         # Softmax block for the output
         self.soft = nn.Sequential(
-            nn.Linear(embedding_size, len(self.vocab.keys())),
+            nn.Linear(embedding_size, len(vocab.keys())),
             nn.Softmax(dim=-1),
         ).to(device)
 
@@ -116,7 +127,6 @@ class Generator(nn.Module):
         
         # The tokenzied output sentences
         out_sent = [[] for i in range(self.batchSize)]
-        lens_sent = [[] for i in range(self.batchSize)]
         
         # Iterate to generate a sentence of new words
         for tok in range(0, self.sequence_length):
@@ -182,10 +192,43 @@ class Generator(nn.Module):
         # Return the output:
         # (N, S, V)
         return out_sent
+
+    
+    # Used to generate a batch of sentences after training
+    def generate(self, batchSize):
+        # Put the model in inference mode
+        self.eval()
+
+        # Convert the batch size to the given value
+        BS = self.batchSize
+        self.batchSize = batchSize
+
+        # Get some sequences from the model
+        with torch.no_grad():
+            out = torch.argmax(self.forward(training=False), dim=-1)
+
+        # Output sentences
+        sents = []
+
+        # Convert the sequences to sentences
+        for b in range(0, out.shape[0]):
+            s = []
+            for i in range(0, out.shape[1]):
+                try:
+                    s.append(self.vocab[out[b, i].item()])
+                except KeyError:
+                    s.append(self.vocab[str(out[b, i].item())])
+            s = " ".join(s)
+            sents.append(s)
+
+        # Convert the batch size back to it's initial value
+        self.batchSize = BS
+
+        return sents
     
     
     # Save the model
-    def saveModel(self, saveDir, saveFile):
+    def saveModel(self, saveDir, saveFile, saveDefFile):
         # Check if the directory exists. If it doesn't
         # create it
         if not os.path.isdir(saveDir):
@@ -193,8 +236,25 @@ class Generator(nn.Module):
         
         # Save the model
         torch.save(self.state_dict(), saveDir + os.sep + saveFile)
+
+        # Save the defaults
+        with open(saveDir + os.sep + saveDefFile, "w") as f:
+            json.dump(self.defaults, f)
     
     
     # Load the model
-    def loadModel(self, loadDir, loadFile):
-        self.load_state_dict(torch.load(loadDir + os.sep + loadFile, map_location=self.device))
+    def loadModel(self, loadDir, loadFile, loadDefFile=None):
+        if loadDefFile:
+            # Load in the defaults
+            with open(loadDir + os.sep + loadDefFile, "r") as f:
+                self.defaults = json.load(f)
+            self.vocab = self.defaults["vocab"]
+
+            # Reinitialize the model with the new defaults
+            self.__init__(self.defaults["vocab"], self.defaults["M"], self.defaults["B"], self.defaults["O"], self.defaults["noiseDist"], self.defaults["hiddenSize"], self.batchSize, self.defaults["embedding_size"], self.defaults["sequence_length"], self.defaults["num_heads"], self.device)
+
+            # Load the model state
+            self.load_state_dict(torch.load(loadDir + os.sep + loadFile, map_location=self.device))
+
+        else:
+            self.load_state_dict(torch.load(loadDir + os.sep + loadFile, map_location=self.device))

@@ -9,6 +9,7 @@
             "type": "python",
             "request": "launch",
             "module": "src.GANs.train",
+            //"module": "src.GANs.generate",
 		    //"module": "src.nonGANs.main",
 		    //"module": "src.helpers.generate_chars",
 		    //"module": "src.helpers.generate_words",

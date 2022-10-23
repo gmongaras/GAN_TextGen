@@ -5,9 +5,9 @@ import random
 # Generate a vocab file csv with two columns, a key
 # and a value
 def generate():
-    vocabFile = "data/Text2/data.txt"
-    outFile = "vocab_text2.csv"
-    outTxtFile = "data/Text2/data2.txt"
+    vocabFile = "data/Text/data.txt"
+    outFile = "vocab_text.csv"
+    outTxtFile = "data/Text/data_clean.txt"
     limit = 70000
     randomize = True # Randomize the vocab to stray from bias
     

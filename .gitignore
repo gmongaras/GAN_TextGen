@@ -2,4 +2,4 @@
 */__pycache__/*
 models_mobile/
 data/Text2/train_data
-models/
+./models/*

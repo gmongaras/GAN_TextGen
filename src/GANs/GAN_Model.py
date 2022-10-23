@@ -16,6 +16,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import os
+import json
 
 
 
@@ -66,14 +67,20 @@ class GAN_Model(nn.Module):
     #   device - Device to put the model on
     #   saveSteps - Number of steps until the model is saved
     #   saveDir - Directory to save the model to
+    #   saveDefFile - Name of the file to save GAN defaults to so it can be easily loaded in
     #   genSaveFile - Name of the file to save the generator model to
+    #   genSaveDefFile - Name of the file to save generator defaults to so it can be easily loaded in
     #   discSaveFile - Name of the file to save the discriminator model to
     #   trainGraphFile - File to save training graph during training
     #   loadInEpoch - Should the data be loaded in as needed instead of
     #                 before training (True if so, False to load before training)
     #   delWhenLoaded - Delete the data as it's loaded in to save space?
     #                   Note: This is automatically False if loadInEpoch is True
-    def __init__(self, vocab, M_gen, B_gen, O_gen, T_disc, B_disc, O_disc, hiddenSize, noiseDist, costSlope, batchSize, embedding_size_gen, embedding_size_disc, sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, genSaveFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
+    def __init__(self, vocab, M_gen, B_gen, O_gen, T_disc, B_disc, O_disc, hiddenSize, 
+        noiseDist, costSlope, batchSize, embedding_size_gen, embedding_size_disc, 
+        sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd, n_D, pooling, 
+        alpha, Lambda, Beta1, Beta2, device, saveSteps, saveDir, saveDefFile, genSaveFile, 
+        genSaveDefFile, discSaveFile, trainGraphFile, loadInEpoch, delWhenLoaded):
         super(GAN_Model, self).__init__()
         
         # Save the needed variables
@@ -91,11 +98,33 @@ class GAN_Model(nn.Module):
         self.embedding_size_disc = embedding_size_disc
         self.costSlope = costSlope
         self.num_heads = num_heads
+
+        # Dictionary of important default parameters for later loading
+        self.defaults = {
+            "vocab": vocab,
+            "M_gen": M_gen,
+            "B_gen": B_gen,
+            "O_gen": O_gen,
+            "T_disc": T_disc,
+            "B_disc": B_disc,
+            "O_disc": O_disc,
+            "hiddenSize": hiddenSize,
+            "noiseDist": noiseDist,
+            "embedding_size_gen": embedding_size_gen,
+            "embedding_size_disc": embedding_size_disc,
+            "sequence_length": sequence_length,
+            "num_heads": num_heads,
+            "HideAfterEnd": HideAfterEnd,
+            "n_D": n_D,
+            "pooling": pooling,
+        }
         
         # Saving paramters
         self.saveSteps = saveSteps
         self.saveDir = saveDir
+        self.saveDefFile = saveDefFile
         self.genSaveFile = genSaveFile
+        self.genSaveDefFile = genSaveDefFile
         self.discSaveFile = discSaveFile
         self.trainGraphFile = trainGraphFile
 
@@ -300,7 +329,7 @@ class GAN_Model(nn.Module):
         for epoch in range(1, epochs+1):
             # Model saving
             if epoch % self.saveSteps == 0:
-                self.saveModels(self.saveDir, self.genSaveFile, self.discSaveFile, epoch)
+                self.saveModels(self.saveDir, self.genSaveFile, self.genSaveDefFile, self.discSaveFile, epoch)
             
             # Create a list of indices which the Discriminator
             # has left to see and the Generator has left to see
@@ -504,7 +533,7 @@ class GAN_Model(nn.Module):
     
     
     # Save the models and a training graph
-    def saveModels(self, saveDir, genFile, discFile, epoch=None):
+    def saveModels(self, saveDir, genFile, genSaveDefFile, discFile, epoch=None):
         if epoch == None:
             self.generator.saveModel(saveDir, genFile)
             self.discriminator.saveModel(saveDir, discFile)
@@ -514,8 +543,10 @@ class GAN_Model(nn.Module):
             l = len(discFile.split(".")[-1])+1
             discFile = discFile[:-l] + f" - {epoch}.pkl"
             
-            self.generator.saveModel(saveDir, genFile)
+            self.generator.saveModel(saveDir, genFile, genSaveDefFile)
             self.discriminator.saveModel(saveDir, discFile)
+            with open(saveDir + os.sep + self.saveDefFile, "w") as f:
+                json.dump(self.defaults, f)
             
             if self.trainGraphFile:
                 fig, ax = plt.subplots()
@@ -541,6 +572,22 @@ class GAN_Model(nn.Module):
                 plt.close()
     
     # Load the models
-    def loadModels(self, loadDir, genFile, discFile):
+    def loadModels(self, loadDir, loadDefFile, genFile, discFile):
+        # Load in the defaults
+        with open(loadDir + os.sep + loadDefFile, "r") as f:
+            self.defaults = json.load(f)
+        self.vocab = self.defaults["vocab"]
+
+        # Create new models
+        if self.dev != "cpu":
+            self.generator = Generator(self.vocab, self.defaults["M_gen"], self.defaults["B_gen"], self.defaults["O_gen"], self.defaults["noiseDist"], self.defaults["hiddenSize"], self.batchSize, self.defaults["embedding_size_gen"], self.defaults["sequence_length"], self.defaults["num_heads"], gpu)
+            self.discriminator = Discriminator(self.defaults["T_disc"], self.defaults["B_disc"], self.defaults["O_disc"], "none", self.defaults["hiddenSize"], len(self.vocab), self.defaults["embedding_size_disc"], self.defaults["num_heads"], self.defaults["pooling"], gpu)
+        else:
+            self.generator = Generator(self.vocab, self.defaults["M_gen"], self.defaults["B_gen"], self.defaults["O_gen"], self.defaults["noiseDist"], self.defaults["hiddenSize"], self.batchSize, self.defaults["embedding_size_gen"], self.defaults["sequence_length"], self.defaults["num_heads"], self.device)
+            self.discriminator = Discriminator(self.defaults["T_disc"], self.defaults["B_disc"], self.defaults["O_disc"], "none", self.defaults["hiddenSize"], len(self.vocab), self.defaults["embedding_size_disc"], self.defaults["num_heads"], self.defaults["pooling"], self.device)
+        self.n_D = self.defaults["n_D"]
+        self.HideAfterEnd = self.defaults["HideAfterEnd"]
+
+        # Load in the models
         self.generator.loadModel(loadDir, genFile)
         self.discriminator.loadModel(loadDir, discFile)

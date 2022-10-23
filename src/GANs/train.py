@@ -1,7 +1,5 @@
 import torch
-from .Diff_GAN_Model import Diff_GAN_Model
 from .GAN_Model import GAN_Model
-from .Norm_Model import Norm_Model
 from ..helpers.helpers import loadVocab
 import click
 from typing import Optional
@@ -14,24 +12,30 @@ from typing import Optional
 @click.command()
 
 # File loading parameters
-@click.option("--input_file", "input_file", type=str, default="data/Text2/data2.txt", help="Location of the txt file with sentences to train the model", required=False)
-@click.option("--vocab_file", "vocab_file", type=str, default="vocab_text2.csv", help="Location of the csv file storing the vocabulary dictionary", required=False)
+@click.option("--input_file", "input_file", type=str, default="data/Text/data_clean.txt", help="Location of the txt file that contains sentences to train the model", required=False)
+@click.option("--vocab_file", "vocab_file", type=str, default="vocab_text.csv", help="Location of the csv file storing the vocabulary dictionary", required=False)
 @click.option("--num_to_load", "num_to_load", type=int, default=-1, help="Number of sentences to load from the input file (-1 for all)", required=False)
 
 
 # Model/graph saving parameters
 @click.option("--saveDir", "saveDir", type=str, default="models", help="Path to save models to", required=False)
+@click.option("--saveDefFile", "saveDefFile", type=str, default="model_def.json", help="File to save GAN defaults to so it can be easily loaded in", required=False)
 @click.option("--genSaveFile", "genSaveFile", type=str, default="gen_model.pkl", help="File to save generator models to", required=False)
+@click.option("--genSaveDefFile", "genSaveDefFile", type=str, default="gen_model_def.json", help="File to save generator defaults to so it can be easily loaded in", required=False)
 @click.option("--discSaveFile", "discSaveFile", type=str, default="disc_model.pkl", help="File to save discriminator models to", required=False)
 @click.option("--trainGraphFile", "trainGraphFile", type=str, default="trainGraph.png", help="File to save the loss graph to", required=False)
 
 
 # Saved state loading parameters
-@click.option("--saveDir", "saveDir", type=str, default="models", help="Path to save models to", required=False)
+@click.option("--loadPreTrained", "loadPreTrained", type=bool, default=False, help="True to load a pretrained model, False to start from a random model", required=False)
+@click.option("--loadDir", "loadDir", type=str, default="models", help="Path to load models from (only used if loadPreTrained is True)", required=False)
+@click.option("--loadDefFile", "loadDefFile", type=str, default="model_def.json", help="File with GAN defaults (only used if loadPreTrained is True)", required=False)
+@click.option("--genLoadFile", "genLoadFile", type=str, default="gen_model.pkl", help="File to load a generator model from (only used if loadPreTrained is True)", required=False)
+@click.option("--discLoadFile", "discLoadFile", type=str, default="disc_model.pkl", help="File to load a discriminator model from (only used if loadPreTrained is True)", required=False)
 
 
 # General model parameters
-@click.option("--M_gen", "M_gen", type=int, default=5, help="Number of input noise embedding blocks", required=False)
+@click.option("--M_gen", "M_gen", type=int, default=8, help="Number of input noise embedding blocks", required=False)
 @click.option("--B_gen", "B_gen", type=int, default=4, help="Number of transformer blocks to encode the input sequence", required=False)
 @click.option("--O_gen", "O_gen", type=int, default=4, help="Number of transformer blocks to get the output sequence", required=False)
 @click.option("--embedding_size_gen", "embedding_size_gen", type=int, default=64, help="Word embedding size for the generator", required=False)
@@ -55,7 +59,7 @@ from typing import Optional
 @click.option("--n_D", "n_D", type=int, default=5, help="Number of times to train the discriminator more than the generator for each epoch", required=False)
 @click.option("--saveSteps", "saveSteps", type=int, default=100, help="Number of steps until the model is saved", required=False)
 @click.option("--loadInEpoch", "loadInEpoch", type=bool, default=False, help="Should the data be loaded in as needed instead of before training? (True if so, False to load before training)", required=False)
-@click.option("--delWhenLoaded", "delWhenLoaded", type=bool, default=True, help="Delete the data as it's loaded in to free allocated memory? Note: This is automatically False if loadInEpoch is True", required=False)
+@click.option("--delWhenLoaded", "delWhenLoaded", type=bool, default=False, help="Delete the data as it's loaded in to free allocated memory? Note: This is automatically False if loadInEpoch is True", required=False)
 
 
 # GAN parameters
@@ -70,9 +74,18 @@ def train(
     num_to_load: Optional[int],
 
     saveDir: Optional[str],
+    saveDefFile: Optional[str],
     genSaveFile: Optional[str],
+    genSaveDefFile: Optional[str],
     discSaveFile: Optional[str],
     trainGraphFile: Optional[str],
+
+    loadPreTrained: Optional[bool],
+    loadDir: Optional[str],
+    loadDefFile: Optional[str],
+    genLoadFile: Optional[str],
+    discLoadFile: Optional[str],
+
     M_gen: Optional[int],
     B_gen: Optional[int],
     O_gen: Optional[int],
@@ -131,27 +144,15 @@ def train(
             batchSize, embedding_size_gen, embedding_size_disc,
             sequence_length, num_heads, dynamic_n, Lambda_n, HideAfterEnd,
             n_D, pooling, alpha, Lambda,
-            Beta1, Beta2, device, saveSteps, saveDir, 
-            genSaveFile, discSaveFile, trainGraphFile,
+            Beta1, Beta2, device, saveSteps, saveDir, saveDefFile,
+            genSaveFile, genSaveDefFile, discSaveFile, trainGraphFile,
             loadInEpoch, delWhenLoaded)
     
     
     ### Training The Model ###
-    #model.loadModels("models", "gen_model - 100.pkl", "disc_model - 100.pkl")
+    if loadPreTrained:
+        model.loadModels(loadDir, loadDefFile, genLoadFile, discLoadFile)
     model.train_model(sentences, epochs)
-    print()
-    
-    
-    ### Model Saving and Predictions ###
-    with torch.no_grad():
-        out = model.generator.forward(training=False)
-        lens = model.generator.forward_lens(out)
-    out = torch.argmax(out, dim=-1)[0]
-    lens = torch.argmax(lens, dim=-1)[0]+1
-    for i in out:
-        print(vocab[i.item()], end=" ")
-    print()
-    print(f"lens: {lens}")
     
     
 if __name__ == "__main__": 
