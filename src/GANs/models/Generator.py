@@ -126,7 +126,7 @@ class Generator(nn.Module):
         Y = None
         
         # The tokenzied output sentences
-        out_sent = [[] for i in range(self.batchSize)]
+        out_sent = torch.empty((self.batchSize, self.sequence_length, len(self.vocab)), device=w.device)
         
         # Iterate to generate a sentence of new words
         for tok in range(0, self.sequence_length):
@@ -172,21 +172,15 @@ class Generator(nn.Module):
             out_tok_soft = self.soft(out_tok)
             
             # Save the softmax output for the discriminator
-            for i in range(self.batchSize):
-                out_sent[i].append(out_tok_soft[i])
+            out_sent[:, tok] = out_tok_soft
             
             # Encode the output token from
             # softmax to a word embedding
-            out_tok = self.Word2Vec(out_tok_soft)
+            out_tok = self.Word2Vec(torch.nn.functional.one_hot(torch.argmax(out_tok_soft, dim=-1), len(self.vocab)).to(out_tok_soft.device).float())
 
             # Add the new token to the current
             # generated sequence
-            Y = torch.cat((Y.clone()[:, :tok], (out_tok).unsqueeze(1)), dim=1)
-                
-        
-        # Turn the output into a tensor
-        out_sent = [torch.stack(sent) for sent in out_sent]
-        out_sent = torch.stack(out_sent)
+            Y = torch.cat((Y.clone()[:, :tok], out_tok.unsqueeze(1)), dim=1)
 
 
         # Return the output:
