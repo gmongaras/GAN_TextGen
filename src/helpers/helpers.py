@@ -271,7 +271,7 @@ def addPadding(X, vocab_inv, sequence_length, encoder):
 def addPadding_one_hot(X, vocab_inv, sequence_length):
     # The padding tensor. Note <END> is used as a temp variable
     # since <PAD> is not in the vocab anymore
-    pad_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<END>"]), len(vocab_inv))
+    pad_enc = torch.nn.functional.one_hot(torch.tensor(vocab_inv["<PAD>"]), len(vocab_inv))
 
     # Instead of padding, use 0s
     # pad_enc = pad_enc*0

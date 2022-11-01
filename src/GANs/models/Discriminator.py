@@ -2,7 +2,7 @@ from ..blocks.discBlock import discBlock
 from torch import nn
 import torch
 import os
-from ..blocks.outTrans import outTrans
+from ..blocks.PositionalEncoding import PositionalEncoding
 
 
 
@@ -39,24 +39,27 @@ class Discriminator(nn.Module):
         # Create the discriminator backbone. Note, each
         # block halves the sequence length if pooling is used
         # (N, S, E) -> (N, S, E)
-        blocks = [discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, pooling) for i in range(B)]
+        blocks = [discBlock(T, embedding_size*2, embedding_size*2, num_heads, hiddenSize, pooling) for i in range(B)]
         self.disc_backbone = nn.Sequential(*blocks).to(device)
         
         # The discriminator classifier head which uses a class
         # token to classify a sentence as real or fake
         # (NxS+1xE) -> (N)
         self.disc_head = nn.Sequential(*[
-            discBlock(T, embedding_size, embedding_size, num_heads, hiddenSize, "none") for i in range(0, O)
+            discBlock(T, embedding_size*2, embedding_size*2, num_heads, hiddenSize, "none") for i in range(0, O)
         ]).to(device)
-        self.disc_head_L = nn.Linear(embedding_size, 1, device=device)
+        self.disc_head_L = nn.Linear(embedding_size*2, 1, device=device)
         
         # Create the class token which will be a parameter
         # initialized to random values
-        self.clsTok = nn.Parameter(torch.rand(1, 1, embedding_size, device=device, requires_grad=True))
+        self.clsTok = nn.Parameter(torch.rand(1, 1, embedding_size*2, device=device, requires_grad=True))
         
         # Optional output activations
         self.Tanh = nn.Tanh().to(device)
         self.Sigmoid = nn.Sigmoid().to(device)
+
+        # Positional encodings for a sequence of shape (?, S, E)
+        self.PositionalEncoding = PositionalEncoding(embedding_size, 0).to(device)
     
     
     
@@ -69,9 +72,13 @@ class Discriminator(nn.Module):
     #   2-D tensor of shape (N, 1) where each value is the
     #     prediction on how real the input is
     def forward(self, X, masks=None):
-        # Convert the sentences and lengths to the proper encoding size
+        # Convert the sentences to the proper encoding size
         # (N, S, V) -> (N, S, E)
         X = self.sent_lookup(X)
+
+        # Add positional encodings to the sentence
+        # (N, S, E) -> (N, S, 2E)
+        X = torch.cat((X, self.PositionalEncoding(torch.zeros(X.shape).to(self.device))), dim=-1)
 
         # Send the sentences through the backbone
         # (N, S, E) -> (N, S, E)

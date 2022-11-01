@@ -48,6 +48,7 @@ def train(
     preds = model.generate(batchSize)
     for b in range(len(preds)):
         print(preds[b])
+        print(len(preds[b].split(" ")))
     
     
 if __name__ == "__main__": 

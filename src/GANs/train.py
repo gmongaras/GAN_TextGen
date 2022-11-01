@@ -36,8 +36,8 @@ from typing import Optional
 
 # General model parameters
 @click.option("--M_gen", "M_gen", type=int, default=8, help="Number of input noise embedding blocks", required=False)
-@click.option("--B_gen", "B_gen", type=int, default=4, help="Number of transformer blocks to encode the input sequence", required=False)
-@click.option("--O_gen", "O_gen", type=int, default=4, help="Number of transformer blocks to get the output sequence", required=False)
+@click.option("--B_gen", "B_gen", type=int, default=6, help="Number of transformer blocks to encode the input sequence", required=False)
+@click.option("--O_gen", "O_gen", type=int, default=6, help="Number of transformer blocks to get the output sequence", required=False)
 @click.option("--embedding_size_gen", "embedding_size_gen", type=int, default=64, help="Word embedding size for the generator", required=False)
 @click.option("--T_disc", "T_disc", type=int, default=2, help="Number of transformer blocks in each discriminator block", required=False)
 @click.option("--B_disc", "B_disc", type=int, default=6, help="Number of discriminator blocks in the discriminator", required=False)

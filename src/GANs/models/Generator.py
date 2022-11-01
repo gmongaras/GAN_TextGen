@@ -209,8 +209,12 @@ class Generator(nn.Module):
             s = []
             for i in range(0, out.shape[1]):
                 try:
+                    if self.vocab[out[b, i].item()][0] == "<":
+                        continue
                     s.append(self.vocab[out[b, i].item()])
                 except KeyError:
+                    if self.vocab[str(out[b, i].item())][0] == "<":
+                        continue
                     s.append(self.vocab[str(out[b, i].item())])
             s = " ".join(s)
             sents.append(s)
