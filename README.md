@@ -1,3 +1,46 @@
+# Contents
+- [Description]
+- [Requirements]
+- [Cloning This Repo]
+- [Creating a vocab]
+- [Training a Model]
+- [Running the Model]
+- [Model Architecture]
+
+
+# Description
+This project started as a side project for for my [internship at Meta](https://github.com/gmongaras/MetaU_Capstone), but became a project I kind of became passionate in. Originally, I just wanted to generate text and I wanted to see if I could do so using a GAN. I was somewhat able to, but I wanted to try to make it better. Unfortunately, even though I tried for a while, I ran into many convergence issues, but decided to
+
+The current project is my end result using GANs which resulted in text that looks better than random, but not entirely like a real sentence. Though, it's still fun to see what the generator produces.
+
+# Requirements
+
+This project was created using `python 3.9.12` but other versions should work too.
+
+Below are the package requirements for this project
+```
+PyTorch 1.12.1
+Numpy 1.23.4
+MatPlotLib 3.5.3
+Click 8.0.4
+Nltk 3.7
+```
+
+You can also paste the following into your terminal to download all the packages
+```
+pip install torch==1.12.1
+pip install numpy==1.23.4
+pip install matplotlib==3.5.3
+pip install click==8.0.4
+pip install nltk==3.7
+```
+
+
+# Cloning The Repo
+
+;
+
+
 # PyTorch_TextGen
 A basic text generation model for a project I'm working on
 
