@@ -2,10 +2,16 @@
 - [Description](#description)
 - [Requirements](#requirements)
 - [Cloning This Repo](#cloning-the-repo)
+- [Constructing Data For Training](#constructing-data-for-training)
+  - [Creating A Data File](#creating-a-data-file)
+  - [Creating A Vocabulary](#creating-a-vocabulary)
 - [Training a Model](#training-a-model)
 - [Running the Model](#running-the-model)
 - [Model Architecture](#model-architecture)
-- [Creating a Vocabulary](#creating-a-vocabulary)
+  - [Generator](#generator)
+  - [Discriminator](#discriminator)
+  - [Training Specifics](#training-specifics)
+  - [Length Esimation Failure](#length-esimation-failure)
 - [References](#references)
 
 
@@ -38,6 +44,7 @@ pip install numpy==1.23.4
 pip install matplotlib==3.5.3
 pip install click==8.0.4
 pip install nltk==3.7
+
 ```
 
 
@@ -52,7 +59,7 @@ The repo should be cloned to your machine, but some files are stored using git L
 Below is a list of all commands to run on the command line when pulling all data:
 ```
 git clone https://github.com/gmongaras/GAN_TextGen.git
-cd GAN_TextGen
+cd GAN_TextGen/
 ```
 
 
@@ -96,7 +103,80 @@ The outTxtFile will be used to train the model to learn how to generate sentence
 
 # Training A Model
 
-Before going into training the model, ensure you have the data downloaded from git lfs from the [Cloning The Repo](#cloning-the-repo) secion. Or you can build your own dataset 
+Before going into training the model, ensure you have the data downloaded from git lfs from the [Cloning The Repo](#cloning-the-repo) secion. Or you can build your own dataset by following [Constructing Data For Training](#constructing-data-for-training).
+
+To train a model, you can run the following command in the root directory:
+
+`python -m src.GANs.train`
+
+to change the parameters of the model, add parameters flags like the following:
+
+`python -m src.GANs.train --[flag 1] [flag value] --[flag 2] [flag value]`
+
+Where [flag 1] is replaced by a parameter name and [flag value] is replaced by the value of the parameter. For example, I could change the number of epochs to 100 like the following:
+
+`python -m src.GANs.train --epochs 100`
+
+The train script has the following parameters:
+
+<b>Required Parameters</b>:
+- input_file [data/Text/data_clean.txt] - (String) File to load the data from. This is the output file from [Creating A Vocabulary](#creating-a-vocaulary)
+- vocab_file [vocab_text.csv] - (String) Location of the csv file storing the vocabulary dictionary
+- num_to_load [-1] - (Integer) Number of sentences to load from the input file. Use -1 to load all sentences from the input file
+
+<b>Saving Parameters</b>:
+- saveDir [models] - (String) Directory to save model checkpoints and graphs
+- saveDefFile [model_def.json] - (String) File to save GAN defaults to so it can be easily loaded in
+- genSaveFile [gen_model.pkl] - (String) File to save generator models to
+- genSaveDefFile [gen_model_def.json] - (String) File to save generator defaults to so it can be easily loaded in when generating sentences
+- discSaveFile [disc_model.pkl] - (String) File to save discriminator models to
+- trainGraphFile [trainGraph.png] - (String) File to save the loss graph to
+
+<b>Saved State Loading Parameters</b>:
+- loadPreTrained [False] - (Boolean) True to load a pretrained model, False to start from a random model
+  - Note: All other parameters under this section are inactive if loadPreTrained is False, otherwise, they will be used
+- loadDir [models] - (String) Path to load models from
+- loadDefFile [model_def.json] - (String) File with GAN defaults (only used if loadPreTrained is True)
+- genLoadFile [gen_model.pkl] - (String) File to load a pretrained generator model from
+- discLoadFile [disc_model.pkl] - (String) File to load a discriminator model from
+
+<b>General Model Parameters</b>:
+- M_gen [8] - (Integer) Number of input noise embedding blocks (number of linear layers to encode the noise)
+- B_gen [6] - (Integer) Number of transformer blocks to encode the input sequence (Number of transformer blocks with cross attention)
+- O_gen [6] - (Integer) Number of transformer blocks to get the output sequence (Number of transformer blocks without cross attention)
+- embedding_size_gen [64] - (Integer) Word embedding size for the generator
+- T_disc [2] - (Integer) Number of transformer blocks in each discriminator block
+- B_disc [6] - (Integer) Number of discriminator blocks in the discriminator (Number of discriminator blocks before the class token)
+- O_disc [6] - (Integer) Number of output transformer blocks in the discrimiantor (Number of transformer blocks after the class token)
+- embedding_size_disc [64] - (Integer) Word embedding size for the discriminator
+- hiddenSize [512] - (Integer) Hidden linear size in the transformer blocks (Projection size in the Feed Forward part of each transformer block)
+- batchSize [64] - (Integer) Batch size used to train the model
+- sequence_length [64] - (Integer) Max number of words in sentence to train the model with
+- num_heads [8] - (Integer) Number of heads in each MHA block
+- noiseDist [unif] - (String) Distribution to sample noise from. Can be one of (\"norm\", \"unif\", \"trunc\" (for truncated normal))
+- pooling [none] - (String) Pooling mode for the discriminator blocks (\"avg\" to use average pooling, \"max\" to use max pooling, or \"none\" to use no pooling)
+- alpha [0.0001] - (Float) Model learning rate
+- Beta1 [0.0] - (Float) Adam beta 1 term
+- Beta2 [0.9] - (Float) Adam beta 2 term
+- device [partgpu] - (String) Device to put the model on (\"cpu\", \"fullgpu\", or \"partgpu\")
+- epochs [100000] - (Integer) Number of epochs to train the model
+- n_D [5] - (Integer) Number of times to train the discriminator more than the generator for each epoch
+- saveSteps [100] - (Integer) Number of steps until the model is saved
+- loadInEpoch [False] - (Boolean) Should the data be loaded in as needed instead of before training? (True if so, False to load before training)
+- delWhenLoaded [False] - (Boolean) Delete the data as it's loaded in to free allocated memory? Note: This is automatically False if loadInEpoch is True
+
+<b>GAN Parameters</b>
+- Lambda [10] - (Integer) Lambda value used for gradient penalty in disc loss
+- dynamic_n [False] - (Boolean) True to dynamically change the number of times to train the models. False otherwise
+- Lambda_n [1] - (Integer) (Only used if dynamic_n is True) Amount to scale the generator over the discriminator to give the generator a higher weight (when >1) or the discriminator a higher weight (when <1)
+- HideAfterEnd [False] - (Boolean) True to hide any tokens after the <END> token in the discriminator MHA with a mask, False to keep these tokens visibile
+  
+As the model trains, save models and graphs of the model progress will be saved to the saveDir directory. Additionally, the loss of each of the models will be printed to the terminal.
+  
+  
+# Running The Model
+  
+When a model has been trained, it can be loaded in to make some sentence predictions and generate new sentences.
 
 
 
