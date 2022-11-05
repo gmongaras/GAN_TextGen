@@ -2,15 +2,15 @@
 - [Description](#description)
 - [Requirements](#requirements)
 - [Cloning This Repo](#cloning-the-repo)
-- [Creating a Vocabulary](#creating-a-vocabulary)
 - [Training a Model](#training-a-model)
 - [Running the Model](#running-the-model)
 - [Model Architecture](#model-architecture)
+- [Creating a Vocabulary](#creating-a-vocabulary)
 - [References](#references)
 
 
 # Description
-This project started as a side project for for my [internship at Meta](https://github.com/gmongaras/MetaU_Capstone), but became a project I kind of became passionate in. Originally, I just wanted to generate text and I wanted to see if I could do so using a GAN. I was somewhat able to, but I wanted to try to make it better. Unfortunately, even though I tried for a while, I ran into many convergence issues when having the model estimate its own length.
+This project started as a side project for my [internship at Meta](https://github.com/gmongaras/MetaU_Capstone), but became a project I kind of became passionate in. Originally, I just wanted to generate text and I wanted to see if I could do so using a GAN. I was somewhat able to, but I wanted to try to make it better. Unfortunately, even though I tried for a while, I ran into many convergence issues when having the model estimate its own length.
 
 The current project is my end result using GANs which resulted in text that looks better than random, but not entirely like a real sentence. Though, it's still fun to see what the generator produces.
 
@@ -19,7 +19,8 @@ https://docs.google.com/document/d/1UA-dEF-IMr5-mOgkp6ORRtAERDEprKHw3K_Lw9A-vmU/
 
 # Requirements
 
-This project was created using `python 3.9.12` but other versions should work too.
+This project was created using `python 3.9.12` but other versions should work too. You can download python [here](https://www.python.org/downloads/).
+- Note that the latest version of python may not work with the project as the latest version may not support PyTorch.
 
 Below are the package requirements for this project
 ```
@@ -42,7 +43,60 @@ pip install nltk==3.7
 
 # Cloning The Repo
 
-;
+To clone the repo, make sure you have git installed on your machine and run the following command:
+
+`git clone https://github.com/gmongaras/PyTorch_TextGen.git`
+
+The repo should be cloned to your machine, but some files are stored using git LFS. These files are the data files to train a model. If you do not wish to train a model, they are not needed, but if you want to train a model, they are required. First, make sure you have [git LFS](https://git-lfs.github.com/) installed on your machine. Then, 
+
+Below is a list of all commands to run on the command line when pulling all data:
+```
+git clone https://github.com/gmongaras/GAN_TextGen.git
+cd GAN_TextGen
+```
+
+
+# Constructing Data For Training
+
+Before training the model, a dataset must first be created. This dataset can be custom or using the dataset I provide in this repo. I will be explaining how the dataset in this repo can be coonstructed for use by the model, but another dataset should be similar.
+
+## Creating A Data File
+
+The dataset I have in this repo contains many news articles and can be found in `data/Text/train_data`. To convert this dataset to a usable form, I created a single file with all the sentences I wanted to train the model which can be found in `data/Text/data.txt`. This file contains a bunch of sentences, each one of them cleaned and broken up by new line characters. To generate this file using the data I provide in the repo, you can use the `script.py` python file in `data/Text`. This file can be run using the following command in the root of the repo: `python -m data.Text.script.py`. The script has the following parameters:
+- indir - Directory to load the news data from (this probably shouldn't be changed)
+- outFile - File to write the output sentences to
+- maxSentSize - Max number of words in a sentence. This corresponds to the length of sentences the model will generate.
+- limit - Limit on the number of sentences to save to the file
+- minLength - Limit on the minimum length of a sentence. A sentence with less words than this limit will not be saved to the output file.
+- minProp - Minimum proportion or words that can be cleaned from a sentence
+  - The proportion is calculated by `(number of words after cleaning)/(number of words before cleaning)`. So, this proportion represents how many words were not removed from a sentence and intuitively represents how clean a sentence was. A sentence with a high proprtion is "cleaner" as less words were removed from the sentence. I kept this proportion high so that dirty sentences with many words or characters removed were not used in the training data.
+
+One note I want to make is that this script has a couple of important parts:
+1. It generates a file of sentences where each word is broken up by a space and each sentence is broken up by a newline.
+2. The sentences are cleaned so that there are no trash characters in the data.
+
+The output of running `script.py` is an output file in the specified directory. This file has one more step before being ready to train the model with.
+
+## Creating A Vocabulary
+
+With a clean file of data, we can now generate a vocabulary for the model. The script to generate a vocabulary for the model is located in `src/helpers/generate_words.py`. To run this script, run the following command in the root directory of this repo: `python -m src.helpers.generate_words.py`. The script has the following parameters:
+- vocabFile - File to load sentences and generate a vocabulary for (this is the output of [Creating A Data File](#creating-a-data-file))
+- outFile - File to save the vocabulary to
+- outTxtFile - A new text file that will be generated with the sentences that the vocabulary has words for.
+- limit - Limit on the number of words that will be added to the vocabulary.
+- randomize - When the vocabulary is generated, randomize the order when True, otherwise don't randomize it.
+
+This script generates two files:
+1. vocabFile - This is a dictionary-like file with the key as a numerical value in the range [0, limit] and a value of a word at that index value. This will be used to numerically encode each word.
+2. outTxtFile - A new text file that stores the exact same sentence as vocabFile (the output of [Creating A Data File](#creating-a-data-file)), but all the sentences in this file have words in the generated vocabulary.
+   - Why is this file generated? When the limit is met, new words cannot be added to the vocabulary. Instead of having unknown words in the input data, it is better to have data with words the model knows. This file only have sentences with words in the vocab while the original vocabFile has sentences with all words. This file is maximized though. If the max vocab cap is hit, only sentences without new words are added to this file as opposed to immediately stopping the creation of this new vocab file.
+
+The outTxtFile will be used to train the model to learn how to generate sentences and the outFile will be used to map words to their numerical representation.
+
+
+# Training A Model
+
+Before going into training the model, ensure you have the data downloaded from git lfs from the [Cloning The Repo](#cloning-the-repo) secion. Or you can build your own dataset 
 
 
 
@@ -123,7 +177,7 @@ The discriminator is a regressive model (not a classification model as it's base
    2. Apply layer norm and a skip connection
    3. Apply a feew forward layer
    4. Apply layer norm and a skip connection
-5. A class token of shape (N, 1, 2E) is concatenated to the sequences to produce a tensor of shape (N, S+1, 2E). These tokens will be used to score each sequence.
+5. Class tokens of shape (N, 1, 2E) are concatenated to the sequences to produce a tensor of shape (N, S+1, 2E). These tokens will be used to score each sequence.
 6. The embeddings with the class token are now sent through <i>O</i> number of output blocks with the following structure:
    1. Apply self-multihead attention to the input embeddings
    2. Apply layer norm and a skip connection
@@ -169,8 +223,7 @@ None of these attempts worked and all led to some type of divergence in the mode
 3. WGAN-GP: https://arxiv.org/abs/1704.00028
 
 
-
-Data from the following:
+Data from the following sources:
 - Random Text: https://www.kaggle.com/datasets/kashnitsky/hierarchical-text-classification
 - Billion word language modeling benchmark: https://github.com/ciprian-chelba/1-billion-word-language-modeling-benchmark
 - Fortunes 1: https://github.com/ruanyf/fortunes
