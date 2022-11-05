@@ -168,15 +168,36 @@ The train script has the following parameters:
 <b>GAN Parameters</b>
 - Lambda [10] - (Integer) Lambda value used for gradient penalty in disc loss
 - dynamic_n [False] - (Boolean) True to dynamically change the number of times to train the models. False otherwise
-- Lambda_n [1] - (Integer) (Only used if dynamic_n is True) Amount to scale the generator over the discriminator to give the generator a higher weight (when >1) or the discriminator a higher weight (when <1)
-- HideAfterEnd [False] - (Boolean) True to hide any tokens after the <END> token in the discriminator MHA with a mask, False to keep these tokens visibile
+- Lambda_n [1] - (Integer) (Only used if dynamic_n is True) Amount to scale the generator over the discriminator to give the generator a higher weight (when \>1) or the discriminator a higher weight (when \<1)
+- HideAfterEnd [False] - (Boolean) True to hide any tokens after the \<END\> token in the discriminator MHA with a mask, False to keep these tokens visibile
   
 As the model trains, save models and graphs of the model progress will be saved to the saveDir directory. Additionally, the loss of each of the models will be printed to the terminal.
   
   
 # Running The Model
   
-When a model has been trained, it can be loaded in to make some sentence predictions and generate new sentences.
+When a model has been trained, it can be loaded in to make some sentence predictions and generate new sentences. To do so, run the following command in the root of the repo:
+  
+`python -m src.GANs.generate --loadDir [loadDir] --loadDefFile [loadDefFile] --loadFile [loadFile]`
+
+Where each parameter in [] is changed to the desired value. For example, I could load in a generator model named "gen_model - 15000.pkl" with the following line:
+
+`python -m src.GANs.generate --loadDir "models/Model1/" --loadDefFile "gen_model_def.json" --loadFile "gen_model - 15000.pkl"`
+  
+  
+
+This file has the following parameters:
+
+<b>Required:</b>
+- loadDir - (String) Path to load the model from
+- loadDefFile - (String) File with generator defaults
+- loadFile - (String) File to load the generator model from
+
+<b>Optional:</b>
+- batchSize [1] - (Integer) Number of sentences to generate at a time
+- device [gpu] - (Integer) Device used to generate sentences with
+
+Running this script will take a second or two and will print out the generated sentence along with the length of that sentence to the terminal.
 
 
 
