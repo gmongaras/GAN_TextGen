@@ -54,12 +54,13 @@ To clone the repo, make sure you have git installed on your machine and run the 
 
 `git clone https://github.com/gmongaras/PyTorch_TextGen.git`
 
-The repo should be cloned to your machine, but some files are stored using git LFS. These files are the data files to train a model. If you do not wish to train a model, they are not needed, but if you want to train a model, they are required. First, make sure you have [git LFS](https://git-lfs.github.com/) installed on your machine. Then, 
+The repo should be cloned to your machine, but some files are stored using git LFS. These files are the data files to train a model. If you do not wish to train a model, they are not needed, but if you want to train a model, they are required. First, make sure you have [git LFS](https://git-lfs.github.com/) installed on your machine. Then, in the root of the repo on your machine, run the command `git lfs pull`
 
 Below is a list of all commands to run on the command line when pulling all data:
 ```
 git clone https://github.com/gmongaras/GAN_TextGen.git
 cd GAN_TextGen/
+git lfs pull
 ```
 
 
