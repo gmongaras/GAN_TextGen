@@ -1,11 +1,11 @@
 # Contents
-- [Description]
-- [Requirements]
-- [Cloning This Repo]
-- [Creating a vocab]
-- [Training a Model]
-- [Running the Model]
-- [Model Architecture]
+- [Description](#description)
+- [Requirements](#requirements)
+- [Cloning This Repo](#cloning-the-repo)
+- [Creating a Vocabulary](#creating-a-vocabulary)
+- [Training a Model](#training-a-model)
+- [Running the Model](#running-the-model)
+- [Model Architecture](#model-architecture)
 
 
 # Description
@@ -39,6 +39,60 @@ pip install nltk==3.7
 # Cloning The Repo
 
 ;
+
+
+
+# Model Architecture
+
+This section of the README goea over how the model works in detail. Before going into how the models work, there is some notation I am using to make it less cluttered:
+- N - Batch size
+- S - Sequence length
+- E - Encoding size for each word/token
+- <i>N</i>(0, 1) - Represents a normal distribution with a mean of 0 and a variance of 1, but this can actually be any distribution we want to generator to model.
+- Feed Forward - This layer is not a single linear layer, rather it is a linear layer projecting the data from E to a higher dimensional space, an activation like GELU, then another linear layer projecting the data back to E.
+
+## Generator
+
+Below is a diagram of the generator model
+<img src="https://github.com/gmongaras/PyTorch_TextGen/raw/main/Model_Diagrams/Generator.png" alt="Generator" width="1000"/>
+
+The generator is a recurrent model that generates a word one at a time from noise. Let's take a look at the steps for how the generator might generate a sentence:
+1. First the generator samples noise of size (N, S, E) and encodes this noise using <i>M</i> linear layers to the same shape as done in the [StyleGAN model](https://arxiv.org/pdf/1812.04948.pdf).
+   - Note: Like with the StyleGAN model, I was thinking the model may be able to control the overall style of the sentence using cross attention with the same noise throughout the entire sequence as this noise is applied globally to the sequence.
+2. Next, the generator samples noise of shape (N, 1, E), preparing to generate the next word. If this is not the first word to be generated, append this noise token to the end of the currently generated sequence.
+   - Note: There are a few options I could have picked here:
+      1. Have the model generate a new token using the current last token in the sequence
+      2. Have the model generate a new token using a predefined token as input
+      3. Have the model generate a new token using random noise
+   - I decided to go with the third option as it seemed to help the model generate better sentence with a high variety.
+3. Positional encodings are added to the sampled noise
+4. The sampled noise with positional encodings is sent through <i>B</i> number of generator backbone blocks with the following steps to generate an encoded form of the noise:
+   1. Apply self-multihead attention to the input noise
+   2. Apply layer norm and a skip connection
+   3. Add noise of shape (N, S, E) to the current embeddings
+      - Quick note: I add noise here to as I wanted to give the model nosie that the it didn't have too much control over. There isn't any mathematical reason, I just thought it would help the model produce a higher variety of output.
+   4. Use cross attention to add the global noise to the embeddings
+   5. Apply layer normalization and a skip connection from the embeddings after the durect noise was added to the sequence
+   6. Apply a feed forward layer
+   7. Apply layer normalization and a skip connection from the embeddings before the feed forward layer
+5. The embeddings are now sent through <i>O</i> number of output blocks with the following structure:
+   1. Apply self-multihead attention to the input embeddings
+   2. Apply layer norm and a skip connection
+   3. Apply a feew forward layer
+   4. Apply layer norm and a skip connection
+   - Note: The model has two types of blocks: one that add noise and one that does not. The idea is that I wanted the model to encode the representation of the sentence and word through the noise blocks and then generate the next word prediction from those encodings using the second blocks without noise.
+6. Slice the output of the generator to get the last token in the sequence. This token is what will be used to predict the next word. The rest of the sequence is not needed.
+7. Apply a linear layer and a softmax layer to transform the embeddings from (N, 1, E) to (N, 1, V) to get the probabilities for the next word in the sequence
+8. Save the current output from step 6 <b>while retaining the gradient of the current output</b> for the discriminator so that the generator can be updated from the discriminator.
+9. Apply the argmax function and a one-hot encoding function to the output of step 6.
+   - The output of these functions retains the shape of the output of step 6: (N, 1, V)
+   - These function encode the
+   - These functions also break the gradient computation for the generator, so the generator output is not updated sequence of sequential outputs, rather it is updated as a sequence of outputs generated at the same time.
+   - Why did I do this? There is one main reason for doing so:
+     - I didn't want to generator to adapt it's output of one token to help it generate the next token. I was afraid the generator may change how it was generating say the first token to help generate the second token as the first token directly effects the second token and the generator would be able to change the first toke nto help it generate the second. Breaking the gradient graph forces it to learn individual tokens without updating the others, but still allows it to learn how one token should come after the other.
+     - Note: The sequence information is still retained throughout the generator output. It still have knowledge of previous outputs, it just can't update those previous outputs based on the future outputs.
+10. Using the currently generated. Repeat from step 2 until there are a total of <i>S</i> word outputs.
+11. When there are <i>S</i> word outputs, concatentate the outputs from step 6 into an embedded sequence of shape (N, S, V) for the discriminator to handle.
 
 
 # PyTorch_TextGen
