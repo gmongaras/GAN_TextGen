@@ -13,7 +13,7 @@ def generate():
     
     
     # The created vocab as each word is seen
-    vocab = {"<START>": 0, "<END>": 2}
+    vocab = {"<START>": 0, "<END>": 2, "<PAD>": 3}
     
     i = len(vocab)
     sents = 0
