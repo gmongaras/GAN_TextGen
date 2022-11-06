@@ -7,6 +7,7 @@
   - [Creating A Vocabulary](#creating-a-vocabulary)
 - [Training a Model](#training-a-model)
 - [Running the Model](#running-the-model)
+- [Model Results](#model-results)
 - [Model Architecture](#model-architecture)
   - [Generator](#generator)
   - [Discriminator](#discriminator)
@@ -62,6 +63,8 @@ git clone https://github.com/gmongaras/GAN_TextGen.git
 cd GAN_TextGen/
 git lfs pull
 ```
+
+Some pretrained models might be in Google Drive. For example, Model 2 is stored using Google Drive. To download those files, go into the drive folder and download them into the desired directory.
 
 
 # Constructing Data For Training
@@ -200,6 +203,35 @@ This file has the following parameters:
 
 Running this script will take a second or two and will print out the generated sentence along with the length of that sentence to the terminal.
 
+
+
+# Model Results
+
+The model resulted in output that looks better than random text and kind of has a sentence-like structure, but overall, the model didn't produce sentences that made any sense.
+
+In the `models/` directory, you will find pretrained models. Model1 used a smalelr discriminator while Model2 used a larger discriminator. The results when varying the generator ended with a poor model, so I didn't include those in the repo.
+
+
+Here are some samples for model 1 when using the `gen_model - 10000.pkl` model:
+```
+swede in the has at in is more in at rational from people how and for and disciplines for
+for if said in leaders from be to have and the do to with the for for to from
+the the of is of the should was and at is which with the to to for their
+has has and not to jo by was the children from from a of and for mcwilliams for have for clenched in quai hylton vapid kalkilya a reliant peltack a khazali he far
+the in has made that him by and not conover not from dishearten not for and for the whitby subdivisions in pearl spaceflight trace
+that his has and cartridges state the has have from to from him be not disciplines for the the for the for expressly the the are grounds furnell delingpole for play losties peltack the for the
+```
+
+
+Here are some samples for model 2 when using the `gen_model - 8000.pkl` model:
+```
+all choices was was all the the guberti by with have bouncer then was care the
+the was was all caley investigative just greentech joined its was by up the byddai hudur on with incomptent information chalones was it was hanning by by to
+was the was was was many exhibited game on with kikuyu the later the on on to that have scolding with msnbc its with ratings fitt 500gb cacao the brdo
+ngs fitt 500gb cacao the brdothe was birgit will ppds viejo was ndiayes first was that by hospital
+alfalfa was was was was yestreday have without just aqsa the was to tippetts have tippetts rompuy plagiarized septicaemia to vulgarity dominant will the
+this was was was was its care the was yesterday emperor against
+```
 
 
 # Model Architecture
