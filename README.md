@@ -209,7 +209,9 @@ Running this script will take a second or two and will print out the generated s
 
 The model resulted in output that looks better than random text and kind of has a sentence-like structure, but overall, the model didn't produce sentences that made any sense.
 
-In the `models/` directory, you will find pretrained models. Model1 used a smalelr discriminator while Model2 used a larger discriminator. The results when varying the generator ended with a poor model, so I didn't include those in the repo.
+In the `models/` directory, you will find pretrained models. Model1 used a smaller discriminator while Model2 used a larger discriminator. The results when varying the generator ended with a poor model, so I didn't include those in the repo.
+
+Along with the pretrained models, two graphs will be generated. One graph is called `trainGraph.png`. This graph is the loss values of the different models throughout training. The other graph is called `MDGraph.png` which displays the mean difference between the real and fake sentences. This value will never be 0, but we want this value to decrease over time, meaning the fake sentences are looking more like real sentences.
 
 
 Here are some samples for model 1 when using the `gen_model - 10000.pkl` model:
@@ -222,6 +224,13 @@ the in has made that him by and not conover not from dishearten not for and for 
 that his has and cartridges state the has have from to from him be not disciplines for the the for the for expressly the the are grounds furnell delingpole for play losties peltack the for the
 ```
 
+Here are the training and mean difference graphs for this model:
+
+<p align="center">
+  <img src="https://github.com/gmongaras/GAN_TextGen/blob/main/models/Model1/trainGraph.png" alt="model 1 train graph" width="400"/>
+  <img src="https://github.com/gmongaras/GAN_TextGen/blob/main/models/Model1/MDGraph.png" alt="model 1 mean difference graph" width="400"/>
+</p>
+
 
 Here are some samples for model 2 when using the `gen_model - 8000.pkl` model:
 ```
@@ -232,6 +241,33 @@ ngs fitt 500gb cacao the brdothe was birgit will ppds viejo was ndiayes first wa
 alfalfa was was was was yestreday have without just aqsa the was to tippetts have tippetts rompuy plagiarized septicaemia to vulgarity dominant will the
 this was was was was its care the was yesterday emperor against
 ```
+
+Here are the training and mean difference graphs for this model:
+
+<p align="center">
+  <img src="https://github.com/gmongaras/GAN_TextGen/blob/main/models/Model2/trainGraph1.png" alt="model 2 train graph" width="400"/>
+  <img src="https://github.com/gmongaras/GAN_TextGen/blob/main/models/Model2/trainGraph2.png" alt="model 2 train graph continued" width="400"/>
+</p>
+<p align="center">
+  <img src="https://github.com/gmongaras/GAN_TextGen/blob/main/models/Model2/MDGraph1.png" alt="model 2 mean difference graph" width="400"/>
+  <img src="https://github.com/gmongaras/GAN_TextGen/blob/main/models/Model2/MDGraph2.png" alt="model 2 mean difference graph continued" width="400"/>
+</p>
+
+
+Here is an example of a failed model:
+```
+1. cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside cragside
+2. olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur olafur
+```
+
+Here is an example graph of a failed model:
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/43501738/200350064-91a6940c-8ee6-4204-a4c5-11ffe4f39942.png" alt="failed model train graph" width="400"/>
+  <img src="https://user-images.githubusercontent.com/43501738/200349762-d246b352-0e4a-46b2-b5ab-e9c3e422fbca.png" alt="failed model mean difference graph" width="400"/>
+</p>
+
+Notice how the train graph converges on a large negative number and the mean difference graph stays at the max value meaning the fake sentences are as far away from the real sentences as possible. So, the model isn't learning at all.
 
 
 # Model Architecture
