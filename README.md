@@ -17,9 +17,9 @@
 
 
 # Description
-This project started as a side project for my [internship at Meta](https://github.com/gmongaras/MetaU_Capstone), but became a project I kind of became passionate about. Originally, I just wanted to generate text and I wanted to see if I could do so using a GAN. I was somewhat able to, but I wanted to try to make it better. Unfortunately, even though I tried for a while, I ran into many convergence issues when having the model estimate its own length.
+This project started as a side project for my [internship at Meta](https://github.com/gmongaras/MetaU_Capstone), but became a project I kind of became passionate about. Originally, I just wanted to generate text and I wanted to see if I could do so using a GAN. I was not really able to and  I wanted to try to make it better. Unfortunately, even though I tried for a while, I ran into many convergence issues when having the model estimate its own length.
 
-The current project is my end result using GANs which resulted in text that looks better than random, but not entirely like a real sentence. Though, it's still fun to see what the generator produces.
+The current project is my end result using GANs which resulted in text that looks better than random, but not really like a real sentence. Though, it's still fun to see what the generator produces.
 
 While creating this project, I documented some of the problems I ran into, though these are definitely not all of them and the documentation is very rough:
 https://docs.google.com/document/d/1UA-dEF-IMr5-mOgkp6ORRtAERDEprKHw3K_Lw9A-vmU/edit?usp=sharing
@@ -207,7 +207,7 @@ Running this script will take a second or two and will print out the generated s
 
 # Model Results
 
-The model resulted in output that looks better than random text and kind of has a sentence-like structure, but overall, the model didn't produce sentences that made any sense.
+The model resulted in output that looks better than random text, but overall, the model didn't produce sentences that made any sense.
 
 In the `models/` directory, you will find pretrained models. Model1 used a smaller discriminator while Model2 used a larger discriminator. The results when varying the generator ended with a poor model, so I didn't include those in the repo.
 
